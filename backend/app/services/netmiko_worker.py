@@ -88,7 +88,7 @@ def _connect_telnet_manual(
     session_log: str,
 ):
     """Telnet login manual using raw telnetlib - PROVEN WORKING!"""
-    import telnetlib
+    import telnetlib  # type: ignore  # deprecated but still works in Python 3.11
     import time
     
     # Use telnetlib directly

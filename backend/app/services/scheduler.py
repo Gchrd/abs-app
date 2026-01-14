@@ -12,6 +12,9 @@ from .audit_log import audit_event
 from hashlib import sha256
 import pytz
 import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
 
 scheduler = AsyncIOScheduler(timezone=pytz.timezone(settings.TIMEZONE))
 
