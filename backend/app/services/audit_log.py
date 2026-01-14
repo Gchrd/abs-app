@@ -1,6 +1,9 @@
 from ..database import SessionLocal
 from ..models import Audit
 from ..utils.timeutil import tznow
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def audit_event(user: str, action: str, target: str, result: str):
@@ -25,6 +28,6 @@ def audit_event(user: str, action: str, target: str, result: str):
         db.add(a)
         db.commit()
     except Exception as e:
-        print(f"[Audit] Failed to log event: {e}")
+        logger.error(f"Failed to log audit event: {e}")
     finally:
         db.close()

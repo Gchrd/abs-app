@@ -205,9 +205,9 @@ def load_schedules_from_db():
                     replace_existing=True,
                     name=f"Scheduled Backup: {sch.name}"
                 )
-                print(f"[Scheduler] Loaded: {sch.name} (every {sch.interval_days} days at {sch.run_at})")
+                logger.info(f"Loaded schedule: {sch.name} (every {sch.interval_days} days at {sch.run_at})")
             except Exception as e:
-                print(f"[Scheduler] Failed to load {sch.name}: {e}")
+                logger.error(f"Failed to load schedule {sch.name}: {e}")
     finally:
         db.close()
 
@@ -231,5 +231,5 @@ def start():
     """
     if not scheduler.running:
         scheduler.start()
-        print("[Scheduler] APScheduler started")
+        logger.info("APScheduler started")
         load_schedules_from_db()
