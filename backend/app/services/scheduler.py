@@ -7,6 +7,7 @@ from ..database import SessionLocal
 from ..models import Schedule, Device, Job, Backup
 from ..utils.crypto import dec
 from .netmiko_worker import fetch_running_config
+from ..utils.config_sanitizer import sanitize_config
 from .audit_log import audit_event
 from hashlib import sha256
 import pytz
@@ -97,10 +98,17 @@ async def run_scheduled_backup(schedule_id: int, schedule_name: str):
                     protocol=device_info['protocol'], 
                     port=device_info['port']
                 )
+
+                # Sanitize content for hashing (ignore timestamps)
+                # fetch_running_config returns bytes, so decode first
+                content_str = content.decode('utf-8', errors='ignore')
+                clean_content_str = sanitize_config(content_str, vendor=device_info['vendor'])
+                clean_hash = sha256(clean_content_str.encode('utf-8')).hexdigest()[:8]
+
                 b = Backup(
                     device_id=device_info['id'], 
                     size_bytes=len(content),
-                    hash=sha256(content).hexdigest()[:8], 
+                    hash=clean_hash, 
                     path=str(path)
                 )
                 db.add(b)

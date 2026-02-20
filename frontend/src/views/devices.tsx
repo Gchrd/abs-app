@@ -21,7 +21,7 @@ interface Device {
   protocol: string;
   port: number | string;
   tags?: string | null;
-  lastBackup?: string;
+  last_backup?: string; // Matching backend JSON key (snake_case)
   enabled?: boolean;
 }
 
@@ -64,31 +64,31 @@ export function DevicesPage() {
     'Cisco (ASA Firewall)',
     'Cisco (NXOS Data Center)',
     'Cisco (WLC Controller)',
-    
+
     // Allied Telesis
     'Allied Telesis (AWPlus)',
-    
+
     // Aruba devices
     'Aruba (AOS-CX Switch)',
     'Aruba (AOS AP/Controller)',
-    
+
     // MikroTik devices
     'MikroTik (RouterOS)',
     'MikroTik (SwitchOS)',
-    
+
     // Huawei devices
     'Huawei (Switch/AP)',
     'Huawei (OLT)',
     'Huawei (SmartAX)',
-    
+
     // Fortinet devices
     'Fortinet (FortiGate)',
-    
+
     // Juniper devices
     'Juniper (JunOS)',
   ];
 
-  const filteredDevices = devices.filter(device => 
+  const filteredDevices = devices.filter(device =>
     device.hostname.toLowerCase().includes(searchQuery.toLowerCase()) ||
     device.ip.includes(searchQuery)
   );
@@ -196,7 +196,7 @@ export function DevicesPage() {
         enabled: newEnabledState,
       });
       // Update local state
-      setDevices(prev => prev.map(d => 
+      setDevices(prev => prev.map(d =>
         d.id === device.id ? { ...d, enabled: newEnabledState } : d
       ));
       toast.success(`Device ${newEnabledState ? 'enabled' : 'disabled'} successfully`);
@@ -276,106 +276,155 @@ export function DevicesPage() {
         </div>
       )}
 
-      {/* Devices Table */}
-      <div className="border rounded-lg bg-white">
+      {/* Devices Groups */}
+      <div className="space-y-8">
         {loading && devices.length === 0 ? (
-          <div className="flex items-center justify-center py-12">
+          <div className="flex items-center justify-center py-12 border rounded-lg bg-white">
             <div className="flex flex-col items-center gap-3">
               <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
               <p className="text-gray-500">Loading devices...</p>
             </div>
           </div>
         ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Hostname</TableHead>
-              <TableHead>IP</TableHead>
-              <TableHead>Vendor</TableHead>
-              <TableHead>Protocol</TableHead>
-              <TableHead>Port</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Last Backup</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredDevices.map((device) => {
-              const isEnabled = device.enabled !== false; // default to true if undefined
+          <>
+            {['Core & Backbone', 'Access Switches', 'Wireless', 'Routing & Specialty'].map((groupName) => {
+              const groupDevices = filteredDevices.filter(d => {
+                const hostname = d.hostname.toLowerCase();
+                const vendor = d.vendor.toLowerCase();
+                const tags = (d.tags || '').toLowerCase();
+
+                let assignedGroup = 'Access Switches'; // Default Fallback
+
+                // 1. Priority: Check Tags explicitly
+                if (tags.includes('core')) assignedGroup = 'Core & Backbone';
+                else if (tags.includes('wifi') || tags.includes('ap') || tags.includes('wireless')) assignedGroup = 'Wireless';
+                else if (tags.includes('router') || tags.includes('routing') || tags.includes('mikrotik') || tags.includes('iot')) assignedGroup = 'Routing & Specialty';
+                else if (tags.includes('access')) assignedGroup = 'Access Switches';
+
+                // 2. Fallback: Heuristic (Guess based on Vendor/Hostname)
+                // Only if no specific tag was found (i.e. if it fell through to default above, we check heuristics to potentially move it)
+                else {
+                  if (vendor.includes('fortinet') || hostname.includes('core')) assignedGroup = 'Core & Backbone';
+                  else if (vendor.includes('aruba') || hostname.includes('ap')) assignedGroup = 'Wireless';
+                  else if (vendor.includes('mikrotik') || hostname.includes('door')) assignedGroup = 'Routing & Specialty';
+                  // else remains 'Access Switches'
+                }
+
+                return assignedGroup === groupName;
+              });
+
+              if (groupDevices.length === 0) return null;
+
               return (
-                <TableRow key={device.id}>
-                  <TableCell>{device.hostname}</TableCell>
-                  <TableCell>{device.ip}</TableCell>
-                  <TableCell>{device.vendor}</TableCell>
-                  <TableCell>{device.protocol}</TableCell>
-                  <TableCell>{device.port}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {userRole === 'admin' ? (
-                        <Switch
-                          checked={isEnabled}
-                          onCheckedChange={() => handleToggleEnabled(device)}
-                          className="data-[state=checked]:bg-green-600"
-                          disabled={togglingId === device.id}
-                        />
-                      ) : null}
-                      <Badge className={isEnabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}>
-                        {isEnabled ? 'Enabled' : 'Disabled'}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell>{device.lastBackup}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      {userRole === 'admin' ? (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              handleEditDevice(device);
-                              setTimeout(() => handleTestConnection(device.id), 100);
-                            }}
-                            title="Test Connection"
-                            disabled={testingConnection || loading}
-                          >
-                            <TestTube className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEditDevice(device)}
-                            title="Edit"
-                            disabled={loading}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDeleteDevice(String(device.id))}
-                            title="Delete"
-                            disabled={deletingId === String(device.id)}
-                          >
-                            {deletingId === String(device.id) ? (
-                              <div className="w-4 h-4 border-2 border-red-200 border-t-red-600 rounded-full animate-spin"></div>
-                            ) : (
-                              <Trash2 className="w-4 h-4 text-red-600" />
-                            )}
-                          </Button>
-                        </>
-                      ) : (
-                        <Button variant="outline" size="sm" onClick={() => handleTestConnection(device.id)} title="Test Connection" disabled={testingConnection}>
-                          <TestTube className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
+                <div key={groupName} className="border rounded-lg bg-white overflow-hidden">
+                  <div className="bg-gray-50 px-4 py-3 border-b flex items-center justify-between">
+                    <h3 className="font-semibold text-gray-700">{groupName}</h3>
+                    <Badge variant="secondary" className="text-xs">
+                      {groupDevices.length} Devices
+                    </Badge>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Hostname</TableHead>
+                        <TableHead>IP</TableHead>
+                        <TableHead>Vendor</TableHead>
+                        <TableHead>Protocol</TableHead>
+                        <TableHead>Port</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Last Backup</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {groupDevices.map((device) => {
+                        const isEnabled = device.enabled !== false;
+                        return (
+                          <TableRow key={device.id}>
+                            <TableCell className="font-medium">{device.hostname}</TableCell>
+                            <TableCell>{device.ip}</TableCell>
+                            <TableCell>{device.vendor}</TableCell>
+                            <TableCell>{device.protocol}</TableCell>
+                            <TableCell>{device.port}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {userRole === 'admin' ? (
+                                  <Switch
+                                    checked={isEnabled}
+                                    onCheckedChange={() => handleToggleEnabled(device)}
+                                    className="data-[state=checked]:bg-green-600"
+                                    disabled={togglingId === device.id}
+                                  />
+                                ) : null}
+                                <Badge className={isEnabled ? 'bg-green-100 text-green-700 hover:bg-green-100' : 'bg-gray-100 text-gray-700 hover:bg-gray-100'}>
+                                  {isEnabled ? 'Enabled' : 'Disabled'}
+                                </Badge>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {device.last_backup
+                                ? new Date(device.last_backup).toLocaleString('id-ID', {
+                                  day: 'numeric', month: 'short', year: 'numeric',
+                                  hour: '2-digit', minute: '2-digit'
+                                })
+                                : '-'
+                              }
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                {userRole === 'admin' ? (
+                                  <>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        handleEditDevice(device);
+                                        setTimeout(() => handleTestConnection(device.id), 100);
+                                      }}
+                                      title="Test Connection"
+                                      disabled={testingConnection || loading}
+                                    >
+                                      <TestTube className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleEditDevice(device)}
+                                      title="Edit"
+                                      disabled={loading}
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleDeleteDevice(String(device.id))}
+                                      title="Delete"
+                                      disabled={deletingId === String(device.id)}
+                                    >
+                                      {deletingId === String(device.id) ? (
+                                        <div className="w-4 h-4 border-2 border-red-200 border-t-red-600 rounded-full animate-spin"></div>
+                                      ) : (
+                                        <Trash2 className="w-4 h-4 text-red-600" />
+                                      )}
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <Button variant="outline" size="sm" onClick={() => handleTestConnection(device.id)} title="Test Connection" disabled={testingConnection}>
+                                    <TestTube className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
               );
             })}
-          </TableBody>
-        </Table>
+          </>
         )}
       </div>
 
@@ -385,12 +434,12 @@ export function DevicesPage() {
           <DialogHeader>
             <DialogTitle>{editingDevice ? 'Edit Device' : 'Add Device'}</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4">
             <div>
               <Label htmlFor="vendor">Vendor</Label>
-              <Select 
-                value={formData.vendor} 
+              <Select
+                value={formData.vendor}
                 onValueChange={(value) => setFormData({ ...formData, vendor: value })}
               >
                 <SelectTrigger>
@@ -427,11 +476,11 @@ export function DevicesPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="protocol">Protocol</Label>
-                <Select 
-                  value={formData.protocol} 
+                <Select
+                  value={formData.protocol}
                   onValueChange={(value) => {
-                    setFormData({ 
-                      ...formData, 
+                    setFormData({
+                      ...formData,
                       protocol: value,
                       port: value === 'SSH' ? '22' : '23'
                     });
@@ -546,7 +595,7 @@ export function DevicesPage() {
           <DialogHeader>
             <DialogTitle>Testing Connection</DialogTitle>
           </DialogHeader>
-          
+
           <div className="py-6">
             {testResult === null ? (
               <div className="flex flex-col items-center gap-4">

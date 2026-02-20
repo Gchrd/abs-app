@@ -25,6 +25,8 @@ class Device(Base):
     secret_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
     tags: Mapped[str | None] = mapped_column(String(256))
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    active_backup_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # FK ke backups.id (plain int, hindari circular FK)
+    last_ack_backup_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # ID backup terbaru yang sudah di-acknowledge admin
 
 class Job(Base):
     __tablename__ = "jobs"

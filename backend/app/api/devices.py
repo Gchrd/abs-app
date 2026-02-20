@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from ..database import SessionLocal
-from ..models import Device
+from ..models import Device, Backup
 from ..schemas import DeviceIn, DeviceOut, TestResult
 from ..utils.crypto import enc, dec
 from ..services.netmiko_worker import fetch_running_config
@@ -64,7 +65,23 @@ def delete_device(device_id: int, db: Session = Depends(get_db), current_user=De
 
 @router.get("", response_model=list[DeviceOut])
 def list_devices(current_user=Depends(get_current_user), db: Session = Depends(get_db)):
-    return [DeviceOut.model_validate(d.__dict__) for d in db.query(Device).all()]
+    # 1. Get all devices
+    devices = db.query(Device).all()
+    
+    # 2. Get latest backup timestamp per device
+    latest_backups_query = db.query(Backup.device_id, func.max(Backup.timestamp)).group_by(Backup.device_id).all()
+    backup_map = {device_id: timestamp for device_id, timestamp in latest_backups_query}
+
+    # 3. Merge data
+    results = []
+    for d in devices:
+        # Create a dictionary from the model instance
+        d_dict = {c.name: getattr(d, c.name) for c in d.__table__.columns}
+        # Add the last_backup field
+        d_dict['last_backup'] = backup_map.get(d.id)
+        results.append(DeviceOut.model_validate(d_dict))
+    
+    return results
 
 @router.get("/tags/available")
 def get_available_tags(current_user=Depends(get_current_user), db: Session = Depends(get_db)):

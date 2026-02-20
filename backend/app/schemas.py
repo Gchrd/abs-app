@@ -25,6 +25,7 @@ class DeviceOut(BaseModel):
     port: int
     tags: Optional[str] = None
     enabled: bool = True
+    last_backup: Optional[datetime] = None
 
 
 class TestResult(BaseModel):
