@@ -86,45 +86,59 @@ async def run_scheduled_backup(schedule_id: int, schedule_name: str):
             })
         
         ok = 0
+        max_attempts = 4
+        retry_delays = [15, 30, 60] # Delays in seconds for attempt 2, 3, and 4
+
         for idx, device_info in enumerate(device_list):
-            try:
-                log_lines.append(f"[{device_info['hostname']}] Connecting to {device_info['ip']}...")
-                path, content = fetch_running_config(
-                    vendor=device_info['vendor'], 
-                    host=device_info['ip'], 
-                    username=device_info['username'],
-                    password=device_info['password'], 
-                    secret=device_info['secret'],
-                    protocol=device_info['protocol'], 
-                    port=device_info['port']
-                )
+            for attempt in range(max_attempts):
+                try:
+                    if attempt == 0:
+                        log_lines.append(f"[{device_info['hostname']}] Connecting to {device_info['ip']}...")
+                    else:
+                        log_lines.append(f"[{device_info['hostname']}] Mencoba backup ulang...")
+                        
+                    path, content = fetch_running_config(
+                        vendor=device_info['vendor'], 
+                        host=device_info['ip'], 
+                        username=device_info['username'],
+                        password=device_info['password'], 
+                        secret=device_info['secret'],
+                        protocol=device_info['protocol'], 
+                        port=device_info['port']
+                    )
 
-                # Sanitize content for hashing (ignore timestamps)
-                # fetch_running_config returns bytes, so decode first
-                content_str = content.decode('utf-8', errors='ignore')
-                clean_content_str = sanitize_config(content_str, vendor=device_info['vendor'])
-                clean_hash = sha256(clean_content_str.encode('utf-8')).hexdigest()[:8]
+                    # Sanitize content for hashing (ignore timestamps)
+                    # fetch_running_config returns bytes, so decode first
+                    content_str = content.decode('utf-8', errors='ignore')
+                    clean_content_str = sanitize_config(content_str, vendor=device_info['vendor'])
+                    clean_hash = sha256(clean_content_str.encode('utf-8')).hexdigest()[:8]
 
-                b = Backup(
-                    device_id=device_info['id'], 
-                    size_bytes=len(content),
-                    hash=clean_hash, 
-                    path=str(path)
-                )
-                db.add(b)
-                ok += 1
-                db.commit()
-                log_lines.append(f"[{device_info['hostname']}] Backup success ({len(content)} bytes, path={path})")
-                
-                # Delay between devices (rate limiting)
-                if idx < len(device_list) - 1:
-                    log_lines.append(f"[{device_info['hostname']}] Waiting 3s before next device...")
-                    await asyncio.sleep(3)
-                
-            except Exception as e:
-                log_lines.append(f"[{device_info['hostname']}] Backup failed: {str(e)}")
-                if idx < len(device_list) - 1:
-                    await asyncio.sleep(2)
+                    b = Backup(
+                        device_id=device_info['id'], 
+                        size_bytes=len(content),
+                        hash=clean_hash, 
+                        path=str(path)
+                    )
+                    db.add(b)
+                    ok += 1
+                    db.commit()
+                    log_lines.append(f"[{device_info['hostname']}] Backup success ({len(content)} bytes, path={path})")
+                    break # Success, exit retry loop
+                    
+                except Exception as e:
+                    if attempt < max_attempts - 1:
+                        # Log the failure and wait before retrying
+                        log_lines.append(f"[{device_info['hostname']}] Backup gagal... ({str(e)})")
+                        delay = retry_delays[attempt]
+                        await asyncio.sleep(delay)
+                    else:
+                        # Final failure log
+                        log_lines.append(f"[{device_info['hostname']}] Backup failed> ({str(e)})")
+            
+            # Delay between devices (rate limiting)
+            if idx < len(device_list) - 1:
+                log_lines.append(f"[{device_info['hostname']}] Waiting 3s before next device...")
+                await asyncio.sleep(3)
         
         # Update job status - re-query to avoid detached instance
         log_lines.append(f"Job completed: {ok}/{len(device_list)} successful")

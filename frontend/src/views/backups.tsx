@@ -7,9 +7,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Download, Search, GitCompare, Star, Loader2 } from 'lucide-react';
+import { Eye, Download, Search, GitCompare, Star, Loader2, ChevronDown, ChevronRight, Trash2, FolderDown } from 'lucide-react';
 import { toast } from 'sonner';
-import { apiGet, apiGetBlob, apiGetText, apiPut } from '@/lib/api';
+import { apiGet, apiGetBlob, apiGetText, apiPut, downloadBackupDate, deleteBackupDate } from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -161,6 +161,12 @@ export function BackupsPage() {
   const [diffTitle, setDiffTitle] = useState('');
   const [diffActiveBackup, setDiffActiveBackup] = useState<ActiveBackup | null>(null); // konteks diff yang sedang dibuka
   const [revertingId, setRevertingId] = useState<number | null>(null);
+
+  // History Grouping & Batch Actions
+  const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
+  const [deletingDate, setDeletingDate] = useState<string | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [batchActionLoading, setBatchActionLoading] = useState<string | null>(null);
 
   // Role check
   const u = typeof window !== 'undefined' ? localStorage.getItem('abs_user') : null;
@@ -338,6 +344,65 @@ export function BackupsPage() {
     }
   };
 
+  const toggleDate = (date: string) => {
+    setExpandedDates(prev => ({ ...prev, [date]: !prev[date] }));
+  };
+
+  const handleDownloadDate = async (date: string) => {
+    setBatchActionLoading(`download-${date}`);
+    try {
+      const blob = await downloadBackupDate(date);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `backups_${date}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success(`Berhasil mengunduh folder backup tanggal ${date}`);
+    } catch (err: unknown) {
+      const msg = (err && typeof err === 'object' && 'message' in err) ? (err as { message?: string }).message : String(err);
+      toast.error('Gagal mengunduh folder: ' + (msg || 'Unknown error'));
+    } finally {
+      setBatchActionLoading(null);
+    }
+  };
+
+  const handleDeleteDate = async () => {
+    if (!deletingDate) return;
+    setBatchActionLoading(`delete-${deletingDate}`);
+    try {
+      await deleteBackupDate(deletingDate);
+      toast.success(`Berhasil menghapus folder backup tanggal ${deletingDate}`);
+      setDeletingDate(null);
+      setDeleteConfirmText('');
+      fetchBackups(); // Refresh data
+    } catch (err: unknown) {
+      const msg = (err && typeof err === 'object' && 'message' in err) ? (err as { message?: string }).message : String(err);
+      toast.error('Gagal menghapus folder: ' + (msg || 'Unknown error'));
+    } finally {
+      setBatchActionLoading(null);
+    }
+  };
+
+  // Group filteredBackups by Date (YYYY-MM-DD from local timezone)
+  const groupedBackups = filteredBackups.reduce((groups: Record<string, Backup[]>, backup) => {
+    const d = new Date(backup.timestamp);
+    // Use local timezone formatting for grouping to avoid UTC shift
+    // padStart handles single digit months/days natively
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const dateKey = `${yyyy}-${mm}-${dd}`;
+    if (!groups[dateKey]) groups[dateKey] = [];
+    groups[dateKey].push(backup);
+    return groups;
+  }, {});
+
+  // Sort dates descending
+  const sortedDates = Object.keys(groupedBackups).sort((a, b) => b.localeCompare(a));
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -476,103 +541,167 @@ export function BackupsPage() {
       {/* ── Tabel 2: Backup History ── */}
       <div className="space-y-3">
         <h3 className="text-base font-semibold text-gray-800">Backup History</h3>
-        <div className="border rounded-lg bg-white">
+        <div className="bg-white rounded-lg">
           {loading && backups.length === 0 ? (
-            <div className="flex items-center justify-center py-12">
+            <div className="flex items-center justify-center py-12 border rounded-lg">
               <div className="flex flex-col items-center gap-3">
                 <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
                 <p className="text-gray-500">Loading backups...</p>
               </div>
             </div>
-          ) : filteredBackups.length === 0 ? (
-            <div className="flex items-center justify-center py-12">
+          ) : sortedDates.length === 0 ? (
+            <div className="flex items-center justify-center py-12 border rounded-lg">
               <p className="text-gray-500">No backups found</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-8">#</TableHead>
-                  <TableHead>Device</TableHead>
-                  <TableHead>Tanggal</TableHead>
-                  <TableHead>Ukuran</TableHead>
-                  <TableHead>Hash</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Aksi</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredBackups.map((backup) => {
-                  const isCurrentlyActive = activeBackups.some(ab => ab.backup_id === backup.id);
-                  const isSuccess = backup.status === 'success';
-                  return (
-                    <TableRow key={backup.id} className={isCurrentlyActive ? 'bg-amber-50' : ''}>
-                      <TableCell className="text-xs text-gray-400">{backup.id}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1.5">
-                          {backup.device_name ?? String(backup.device_id)}
-                          {isCurrentlyActive && (
-                            <Star className="w-3 h-3 text-amber-500 fill-amber-500" title="Active Backup" />
-                          )}
+            <div className="flex flex-col gap-3">
+              {sortedDates.map((dateKey) => {
+                const dayBackups = groupedBackups[dateKey];
+                const isExpanded = expandedDates[dateKey] || false;
+                // Cek apakah ada yg active
+                const hasActiveBackup = dayBackups.some(b => activeBackups.some(ab => ab.backup_id === b.id));
+                const d = new Date(dateKey);
+                const displayDate = d.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+                return (
+                  <div key={dateKey} className="border rounded-lg overflow-hidden bg-white shadow-sm">
+                    {/* Header bar */}
+                    <div
+                      className={`flex items-center justify-between p-3 cursor-pointer ${isExpanded ? 'bg-gray-50 border-b' : 'hover:bg-gray-50'}`}
+                      onClick={() => toggleDate(dateKey)}
+                    >
+                      <div className="flex items-center gap-3 flex-1">
+                        <span className="text-gray-400">
+                          {isExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+                        </span>
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-gray-800">{displayDate}</span>
+                          <span className="text-xs text-gray-500">{dayBackups.length} file backup</span>
                         </div>
-                      </TableCell>
-                      <TableCell className="text-sm">{formatDate(backup.timestamp)}</TableCell>
-                      <TableCell>{formatSize(backup.size_bytes)}</TableCell>
-                      <TableCell>
-                        <code className="text-xs bg-gray-100 px-2 py-1 rounded">{backup.hash.slice(0, 8)}</code>
-                      </TableCell>
-                      <TableCell>
-                        {isSuccess ? (
-                          <Badge className="bg-green-100 text-green-700">✅ success</Badge>
-                        ) : (
-                          <Badge className="bg-red-100 text-red-700">❌ failed</Badge>
+                        {hasActiveBackup && (
+                          <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200">
+                            <Star className="w-3 h-3 fill-amber-500 text-amber-500 mr-1" />
+                            Ada Active Backup
+                          </Badge>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        {isSuccess ? (
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handlePreview(backup)}
-                              title="Preview"
-                              className="gap-1"
-                              disabled={previewingId === backup.id || downloadingId === backup.id}
-                            >
-                              {previewingId === backup.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Eye className="w-4 h-4" />
-                              )}
-                              {previewingId === backup.id ? 'Loading...' : 'View'}
-                            </Button>
-                            {!isCurrentlyActive && isAdmin && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleSetActive(backup.id)}
-                                title="Jadikan Active Backup"
-                                className="gap-1 text-amber-600 border-amber-300 hover:bg-amber-50"
-                                disabled={settingActiveId === backup.id}
-                              >
-                                {settingActiveId === backup.id ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <Star className="w-4 h-4" />
-                                )}
-                                {settingActiveId === backup.id ? 'Setting...' : 'Jadikan Aktif'}
-                              </Button>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-400">-</span>
+                      </div>
+
+                      {/* Batch Actions */}
+                      <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          disabled={batchActionLoading === `download-${dateKey}`}
+                          onClick={() => handleDownloadDate(dateKey)}
+                        >
+                          {batchActionLoading === `download-${dateKey}` ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <FolderDown className="w-4 h-4 text-blue-600" />
+                          )}
+                          <span className="hidden sm:inline">Unduh Folder</span>
+                        </Button>
+
+                        {!hasActiveBackup && isAdmin && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                            onClick={() => setDeletingDate(dateKey)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            <span className="hidden sm:inline">Hapus Folder</span>
+                          </Button>
                         )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                      </div>
+                    </div>
+
+                    {/* Expanded Content */}
+                    {isExpanded && (
+                      <div className="bg-white p-2">
+                        <Table>
+                          <TableHeader className="bg-gray-50">
+                            <TableRow>
+                              <TableHead className="w-12 text-center text-xs">#</TableHead>
+                              <TableHead className="text-xs">Device</TableHead>
+                              <TableHead className="text-xs">Waktu</TableHead>
+                              <TableHead className="text-xs">Ukuran</TableHead>
+                              <TableHead className="text-xs">Hash</TableHead>
+                              <TableHead className="text-xs">Status</TableHead>
+                              <TableHead className="text-xs">Aksi</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {dayBackups.map((backup, idx) => {
+                              const isCurrentlyActive = activeBackups.some(ab => ab.backup_id === backup.id);
+                              const isSuccess = backup.status === 'success';
+                              return (
+                                <TableRow key={backup.id} className={isCurrentlyActive ? 'bg-amber-50/50' : ''}>
+                                  <TableCell className="text-xs text-gray-400 text-center">{idx + 1}</TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center gap-1.5 font-medium">
+                                      {backup.device_name ?? String(backup.device_id)}
+                                      {isCurrentlyActive && (
+                                        <Star className="w-3 h-3 text-amber-500 fill-amber-500" aria-label="Active Backup" />
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-sm">
+                                    {new Date(backup.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                                  </TableCell>
+                                  <TableCell className="text-sm text-gray-600">{formatSize(backup.size_bytes)}</TableCell>
+                                  <TableCell>
+                                    <code className="text-xs bg-gray-100/80 px-1.5 py-0.5 rounded text-gray-500">{backup.hash.slice(0, 8)}</code>
+                                  </TableCell>
+                                  <TableCell>
+                                    {isSuccess ? (
+                                      <Badge className="bg-green-100/70 text-green-700 text-[10px] px-1.5 border border-green-200">✅ success</Badge>
+                                    ) : (
+                                      <Badge className="bg-red-100/70 text-red-700 text-[10px] px-1.5 border border-red-200">❌ failed</Badge>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    {isSuccess ? (
+                                      <div className="flex gap-2">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => handlePreview(backup)}
+                                          title="Preview"
+                                          className="h-8 w-8 p-0"
+                                          disabled={previewingId === backup.id || downloadingId === backup.id}
+                                        >
+                                          {previewingId === backup.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4 text-gray-500" />}
+                                        </Button>
+                                        {!isCurrentlyActive && isAdmin && (
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleSetActive(backup.id)}
+                                            title="Jadikan Active Backup"
+                                            className="h-8 w-8 p-0"
+                                            disabled={settingActiveId === backup.id}
+                                          >
+                                            {settingActiveId === backup.id ? <Loader2 className="w-4 h-4 animate-spin text-amber-500" /> : <Star className="w-4 h-4 text-gray-400 hover:text-amber-500" />}
+                                          </Button>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <span className="text-xs text-gray-400">-</span>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       </div>
@@ -692,6 +821,57 @@ export function BackupsPage() {
                 </div>
               )}
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Dialog Konfirmasi Delete Folder ── */}
+      <Dialog open={deletingDate !== null} onOpenChange={(open) => !open && setDeletingDate(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="w-5 h-5" />
+              Konfirmasi Hapus Permanen
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <p className="text-sm text-gray-600">
+              Anda akan menghapus secara permanen seluruh file konfigurasi backup pada tanggal <strong>{deletingDate && new Date(deletingDate).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong>.
+            </p>
+            <div className="bg-red-50 border border-red-200 text-red-800 p-3 rounded text-sm">
+              <p className="font-semibold mb-1">Perhatian!</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Tindakan ini tidak dapat dibatalkan.</li>
+                <li>Semua riwayat dan file fisik config di database dan server untuk hari ini akan dilenyapkan.</li>
+              </ul>
+            </div>
+            <div className="space-y-2 pt-2">
+              <label className="text-sm font-medium text-gray-700">
+                Ketik <span className="font-bold text-black select-none">Saya yakin</span> untuk melanjutkan:
+              </label>
+              <Input
+                placeholder="Perhatikan penggunaan huruf kapital"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setDeletingDate(null); setDeleteConfirmText(''); }}>
+              Batal
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteConfirmText !== "Saya yakin" || batchActionLoading === `delete-${deletingDate}`}
+              onClick={handleDeleteDate}
+              className="gap-2"
+            >
+              {batchActionLoading === `delete-${deletingDate}` ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Menghapus...</>
+              ) : (
+                <><Trash2 className="w-4 h-4" /> Ya, Hapus Permanen</>
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

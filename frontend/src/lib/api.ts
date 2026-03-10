@@ -149,3 +149,12 @@ export async function apiGetText(path: string, withAuth = true): Promise<string>
 
   return res.text();
 }
+
+// History Backup Date Management
+export async function downloadBackupDate(date: string) {
+  return apiGetBlob(`/backups/download-date/${date}`);
+}
+
+export async function deleteBackupDate(date: string) {
+  return apiDelete(`/backups/date/${date}`);
+}

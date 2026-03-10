@@ -1,7 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from ..database import SessionLocal
+import io
+import zipfile
+from datetime import datetime
+from sqlalchemy import func
 from ..models import Backup, Device
 from pathlib import Path
 from ..security import get_current_user, require_admin
@@ -189,3 +193,86 @@ def delete_backup(backup_id: int, db: Session = Depends(get_db), current_user=De
     
     audit_event(user=current_user.username, action="backup_delete", target=f"{device_name} ({b.timestamp.strftime('%Y-%m-%d %H:%M')})", result="success")
     return {"message": "Backup deleted successfully"}
+
+
+@router.get("/download-date/{date_str}")
+def download_backup_date(date_str: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    """
+    Download a ZIP file containing all backups for the specified date (YYYY-MM-DD).
+    """
+    try:
+        target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(400, "Invalid date format, expected YYYY-MM-DD")
+
+    # Get backups where timestamp cast to date matches the target date
+    # Compatible with SQLite via func.date
+    backups = db.query(Backup).filter(func.date(Backup.timestamp) == target_date.isoformat()).all()
+    
+    if not backups:
+        raise HTTPException(404, f"No backups found for date {date_str}")
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for b in backups:
+            dev = db.get(Device, b.device_id)
+            if not dev:
+                continue
+            
+            p = Path(b.path)
+            if p.exists():
+                # filename formatting: hostname_timestamp.txt
+                timestamp_str = b.timestamp.strftime('%H%M%S')
+                filename = f"{dev.hostname}_{timestamp_str}_{p.name}"
+                zip_file.write(p, arcname=filename)
+                
+    zip_buffer.seek(0)
+    
+    audit_event(user=current_user.username, action="backup_download_batch", target=f"date: {date_str}", result=f"success ({len(backups)} files)")
+    
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename=backups_{date_str}.zip"}
+    )
+
+@router.delete("/date/{date_str}")
+def delete_backup_date(date_str: str, db: Session = Depends(get_db), current_user=Depends(require_admin)):
+    """
+    Deletes all backups for a specific date (YYYY-MM-DD), but ONLY if none of them are marked as active/locked.
+    """
+    try:
+        target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(400, "Invalid date format, expected YYYY-MM-DD")
+
+    backups = db.query(Backup).filter(func.date(Backup.timestamp) == target_date.isoformat()).all()
+    
+    if not backups:
+        raise HTTPException(404, f"No backups found for date {date_str}")
+
+    # Validation: Check if ANY backup in this date is active or acknowledged
+    # This prevents deleting backups that are currently set as the "reference"
+    for b in backups:
+        dev = db.get(Device, b.device_id)
+        if dev:
+            if dev.active_backup_id == b.id or dev.last_ack_backup_id == b.id:
+                raise HTTPException(403, f"Cannot delete date {date_str} because backup ID {b.id} is currently locked/active for device {dev.hostname}.")
+
+    deleted_count = 0
+    for b in backups:
+        try:
+            file_path = Path(b.path)
+            if file_path.exists():
+                file_path.unlink() # Delete the physical text file
+        except Exception as e:
+            # Continue deleting others even if one text file fails
+            print(f"Warning: Failed to delete physical file {b.path}: {e}")
+        
+        db.delete(b)
+        deleted_count += 1
+
+    db.commit()
+    
+    audit_event(user=current_user.username, action="backup_delete_batch", target=f"date: {date_str}", result=f"success (deleted {deleted_count} backups)")
+    return {"message": f"Successfully deleted {deleted_count} backups for date {date_str}"}
