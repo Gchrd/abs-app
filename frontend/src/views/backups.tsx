@@ -360,10 +360,10 @@ export function BackupsPage() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast.success(`Berhasil mengunduh folder backup tanggal ${date}`);
+      toast.success(`Successfully downloaded backup folder for ${date}`);
     } catch (err: unknown) {
       const msg = (err && typeof err === 'object' && 'message' in err) ? (err as { message?: string }).message : String(err);
-      toast.error('Gagal mengunduh folder: ' + (msg || 'Unknown error'));
+      toast.error('Failed to download folder: ' + (msg || 'Unknown error'));
     } finally {
       setBatchActionLoading(null);
     }
@@ -374,13 +374,13 @@ export function BackupsPage() {
     setBatchActionLoading(`delete-${deletingDate}`);
     try {
       await deleteBackupDate(deletingDate);
-      toast.success(`Berhasil menghapus folder backup tanggal ${deletingDate}`);
+      toast.success(`Successfully deleted backup folder for ${deletingDate}`);
       setDeletingDate(null);
       setDeleteConfirmText('');
       fetchBackups(); // Refresh data
     } catch (err: unknown) {
       const msg = (err && typeof err === 'object' && 'message' in err) ? (err as { message?: string }).message : String(err);
-      toast.error('Gagal menghapus folder: ' + (msg || 'Unknown error'));
+      toast.error('Failed to delete folder: ' + (msg || 'Unknown error'));
     } finally {
       setBatchActionLoading(null);
     }
@@ -417,7 +417,7 @@ export function BackupsPage() {
         <div className="flex items-center gap-2">
           <Star className="w-4 h-4 text-amber-500" />
           <h3 className="text-base font-semibold text-gray-800">Active Backup</h3>
-          <span className="text-xs text-gray-500">(1 per device — dijadikan referensi config)</span>
+          <span className="text-xs text-gray-500">(1 per device — config's references)</span>
         </div>
 
         <div className="border rounded-lg bg-white">
@@ -428,18 +428,18 @@ export function BackupsPage() {
             </div>
           ) : activeBackups.length === 0 ? (
             <div className="flex items-center justify-center py-10">
-              <p className="text-gray-400 text-sm">Tidak ada active backup</p>
+              <p className="text-gray-400 text-sm"> Inactive backup</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Device</TableHead>
-                  <TableHead>Active Sejak</TableHead>
-                  <TableHead>Ukuran</TableHead>
+                  <TableHead>Started</TableHead>
+                  <TableHead>Size</TableHead>
                   <TableHead>Hash</TableHead>
                   <TableHead>Config Status</TableHead>
-                  <TableHead>Aksi</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -576,12 +576,12 @@ export function BackupsPage() {
                         </span>
                         <div className="flex flex-col">
                           <span className="font-semibold text-gray-800">{displayDate}</span>
-                          <span className="text-xs text-gray-500">{dayBackups.length} file backup</span>
+                          <span className="text-xs text-gray-500">{dayBackups.length} backup file{dayBackups.length > 1 ? 's' : ''}</span>
                         </div>
                         {hasActiveBackup && (
                           <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200">
                             <Star className="w-3 h-3 fill-amber-500 text-amber-500 mr-1" />
-                            Ada Active Backup
+                            Active Backup Present
                           </Badge>
                         )}
                       </div>
@@ -600,7 +600,7 @@ export function BackupsPage() {
                           ) : (
                             <FolderDown className="w-4 h-4 text-blue-600" />
                           )}
-                          <span className="hidden sm:inline">Unduh Folder</span>
+                          <span className="hidden sm:inline">Download Folder</span>
                         </Button>
 
                         {!hasActiveBackup && isAdmin && (
@@ -611,7 +611,7 @@ export function BackupsPage() {
                             onClick={() => setDeletingDate(dateKey)}
                           >
                             <Trash2 className="w-4 h-4" />
-                            <span className="hidden sm:inline">Hapus Folder</span>
+                            <span className="hidden sm:inline">Delete Folder</span>
                           </Button>
                         )}
                       </div>
@@ -625,11 +625,11 @@ export function BackupsPage() {
                             <TableRow>
                               <TableHead className="w-12 text-center text-xs">#</TableHead>
                               <TableHead className="text-xs">Device</TableHead>
-                              <TableHead className="text-xs">Waktu</TableHead>
-                              <TableHead className="text-xs">Ukuran</TableHead>
+                              <TableHead className="text-xs">Time</TableHead>
+                              <TableHead className="text-xs">Size</TableHead>
                               <TableHead className="text-xs">Hash</TableHead>
                               <TableHead className="text-xs">Status</TableHead>
-                              <TableHead className="text-xs">Aksi</TableHead>
+                              <TableHead className="text-xs">Actions</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -831,26 +831,26 @@ export function BackupsPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
               <Trash2 className="w-5 h-5" />
-              Konfirmasi Hapus Permanen
+              Confirm Delete Permanently
             </DialogTitle>
           </DialogHeader>
           <div className="py-4 space-y-4">
             <p className="text-sm text-gray-600">
-              Anda akan menghapus secara permanen seluruh file konfigurasi backup pada tanggal <strong>{deletingDate && new Date(deletingDate).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong>.
+              You are about to permanently delete all backup configuration files on <strong>{deletingDate && new Date(deletingDate).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong>.
             </p>
             <div className="bg-red-50 border border-red-200 text-red-800 p-3 rounded text-sm">
-              <p className="font-semibold mb-1">Perhatian!</p>
+              <p className="font-semibold mb-1">Warning!</p>
               <ul className="list-disc pl-5 space-y-1">
-                <li>Tindakan ini tidak dapat dibatalkan.</li>
-                <li>Semua riwayat dan file fisik config di database dan server untuk hari ini akan dilenyapkan.</li>
+                <li>This action cannot be undone.</li>
+                <li>All history and physical config files in the database and server for today will be deleted.</li>
               </ul>
             </div>
             <div className="space-y-2 pt-2">
               <label className="text-sm font-medium text-gray-700">
-                Ketik <span className="font-bold text-black select-none">Saya yakin</span> untuk melanjutkan:
+                Type <span className="font-bold text-black select-none">I am sure</span> to continue:
               </label>
               <Input
-                placeholder="Perhatikan penggunaan huruf kapital"
+                placeholder="Type 'I am sure' to continue"
                 value={deleteConfirmText}
                 onChange={(e) => setDeleteConfirmText(e.target.value)}
               />
@@ -858,18 +858,18 @@ export function BackupsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setDeletingDate(null); setDeleteConfirmText(''); }}>
-              Batal
+              Cancel
             </Button>
             <Button
               variant="destructive"
-              disabled={deleteConfirmText !== "Saya yakin" || batchActionLoading === `delete-${deletingDate}`}
+              disabled={deleteConfirmText !== "I am sure" || batchActionLoading === `delete-${deletingDate}`}
               onClick={handleDeleteDate}
               className="gap-2"
             >
               {batchActionLoading === `delete-${deletingDate}` ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Menghapus...</>
+                <><Loader2 className="w-4 h-4 animate-spin" /> Deleting...</>
               ) : (
-                <><Trash2 className="w-4 h-4" /> Ya, Hapus Permanen</>
+                <><Trash2 className="w-4 h-4" /> Yes, Delete Permanently</>
               )}
             </Button>
           </DialogFooter>

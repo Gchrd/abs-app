@@ -390,17 +390,52 @@ sudo chmod -R 755 backend/backups backend/data
 
 ---
 
-## 🔄 Updating the Application
+### 🔄 Updating the Application
 
-### Update from GitHub
+Jika Bapak sudah memiliki data lama di VM dan ingin mengupdate ke versi terbaru (Bahasa Inggris + Fitur Baru), ikuti langkah ini:
 
+#### Step 1: Tarik Kode Terbaru
 ```bash
-# Pull latest changes
 cd abs-app
 git pull origin main
+```
 
-# Rebuild and restart
+#### Step 2: Hentikan Kontainer
+```bash
 sudo docker compose down
+```
+
+#### Step 3: Migrasi Database (PENTING!)
+Karena ada penambahan kolom baru di tabel perangkat, Bapak wajib menjalankan perintah ini untuk "merenovasi" database lama di VM agar kompatibel dengan sistem baru:
+
+```bash
+sudo docker run --rm -v $(pwd)/backend/data:/app/data python:3.11-slim python -c "
+import sqlite3;
+conn = sqlite3.connect('/app/data/abs.db');
+cursor = conn.cursor();
+cursor.execute('PRAGMA table_info(devices)');
+columns = [c[1] for c in cursor.fetchall()];
+
+# Daftar kolom yang mungkin hilang di versi lama
+new_columns = ['active_backup_id', 'last_ack_backup_id'];
+
+for col in new_columns:
+    if col not in columns:
+        print(f'Adding missing column: {col}...');
+        cursor.execute(f'ALTER TABLE devices ADD COLUMN {col} INTEGER');
+        conn.commit();
+        print(f'✅ {col} added.');
+    else:
+        print(f'✅ {col} already exists.');
+
+conn.close();
+print('\n--- Migration Completed Successully ---');
+"
+```
+
+#### Step 4: Build & Restart
+```bash
+# Bersihkan cache lama agar build segar
 sudo docker compose build --no-cache
 sudo docker compose up -d
 ```
