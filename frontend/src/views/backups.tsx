@@ -99,34 +99,38 @@ function DiffViewer({ current, previous }: { current: string; previous: string }
   };
 
   return (
-    <div className="grid grid-cols-2 gap-1 font-mono text-xs overflow-auto max-h-[60vh]">
+    <div className="grid grid-cols-2 gap-1 font-mono text-xs max-h-[60vh]">
       {/* Previous (left) */}
-      <div className="bg-gray-900 rounded-l overflow-auto">
+      <div className="bg-gray-900 rounded-l overflow-auto max-h-[60vh]">
         <div className="sticky top-0 bg-gray-800 text-gray-400 px-3 py-1 text-xs font-semibold border-b border-gray-700">
           ← Previous
         </div>
-        {leftLines.map((line, i) => (
-          <div key={i} className={`flex ${bgColor(line.type)}`}>
-            <span className={`select-none w-10 shrink-0 text-right pr-3 py-0.5 border-r border-gray-700 ${lineNumColor(line.type)}`}>
-              {line.text !== '' ? line.lineNo : ''}
-            </span>
-            <span className="px-3 py-0.5 whitespace-pre break-all">{line.text}</span>
-          </div>
-        ))}
+        <div className="min-w-max">
+          {leftLines.map((line, i) => (
+            <div key={i} className={`flex ${bgColor(line.type)}`}>
+              <span className={`select-none w-10 shrink-0 text-right pr-3 py-0.5 border-r border-gray-700 ${lineNumColor(line.type)}`}>
+                {line.text !== '' ? line.lineNo : ''}
+              </span>
+              <span className="px-3 py-0.5 whitespace-pre">{line.text}</span>
+            </div>
+          ))}
+        </div>
       </div>
       {/* Current (right) */}
-      <div className="bg-gray-900 rounded-r overflow-auto">
+      <div className="bg-gray-900 rounded-r overflow-auto max-h-[60vh]">
         <div className="sticky top-0 bg-gray-800 text-gray-400 px-3 py-1 text-xs font-semibold border-b border-gray-700">
           Current →
         </div>
-        {rightLines.map((line, i) => (
-          <div key={i} className={`flex ${bgColor(line.type)}`}>
-            <span className={`select-none w-10 shrink-0 text-right pr-3 py-0.5 border-r border-gray-700 ${lineNumColor(line.type)}`}>
-              {line.text !== '' ? line.lineNo : ''}
-            </span>
-            <span className="px-3 py-0.5 whitespace-pre break-all">{line.text}</span>
-          </div>
-        ))}
+        <div className="min-w-max">
+          {rightLines.map((line, i) => (
+            <div key={i} className={`flex ${bgColor(line.type)}`}>
+              <span className={`select-none w-10 shrink-0 text-right pr-3 py-0.5 border-r border-gray-700 ${lineNumColor(line.type)}`}>
+                {line.text !== '' ? line.lineNo : ''}
+              </span>
+              <span className="px-3 py-0.5 whitespace-pre">{line.text}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -522,7 +526,7 @@ export function BackupsPage() {
                             className="gap-1 text-orange-600 border-orange-300 hover:bg-orange-50"
                           >
                             <GitCompare className="w-3 h-3" />
-                            View Diff
+                            View Difference
                           </Button>
                         )}
                       </div>
