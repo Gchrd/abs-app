@@ -87,6 +87,62 @@ def list_active_backups(current_user=Depends(get_current_user), db: Session = De
     return out
 
 
+@router.get("/download-active")
+def download_active_backups(current_user=Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Download a ZIP file containing the currently ACTIVE backups for all devices.
+    """
+    db.expire_all()
+    devices = db.query(Device).filter(Device.enabled == True).all()
+    backups_to_zip = []
+
+    for dev in devices:
+        # Get the latest successful backup first
+        latest = (
+            db.query(Backup)
+            .filter(Backup.device_id == dev.id, Backup.status == "success")
+            .order_by(Backup.timestamp.desc())
+            .first()
+        )
+        if not latest:
+            continue
+
+        # Determine active backup
+        if dev.active_backup_id is None:
+            active = latest
+        else:
+            active = db.get(Backup, dev.active_backup_id)
+            if not active:
+                active = latest
+        
+        backups_to_zip.append((dev, active))
+
+    if not backups_to_zip:
+        raise HTTPException(404, "No active backups found to download.")
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for dev, b in backups_to_zip:
+            p = Path(b.path)
+            if p.exists():
+                # filename formatting: hostname_active_timestamp.txt
+                timestamp_str = b.timestamp.strftime('%H%M%S')
+                # Include the date as well so it's clearer
+                date_str = b.timestamp.strftime('%Y%m%d')
+                filename = f"{dev.hostname}_active_{date_str}_{timestamp_str}.txt"
+                zip_file.write(p, arcname=filename)
+
+    zip_buffer.seek(0)
+    
+    audit_event(user=current_user.username, action="backup_download_active_batch", target="active_backups", result=f"success ({len(backups_to_zip)} files)")
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename=active_backups_{timestamp}.zip"}
+    )
+
 @router.put("/{backup_id}/set-active")
 def set_active_backup(
     backup_id: int,

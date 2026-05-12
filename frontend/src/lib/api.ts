@@ -158,3 +158,7 @@ export async function downloadBackupDate(date: string) {
 export async function deleteBackupDate(date: string) {
   return apiDelete(`/backups/date/${date}`);
 }
+
+export async function downloadActiveBackups() {
+  return apiGetBlob('/backups/download-active');
+}

@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Eye, Download, Search, GitCompare, Star, Loader2, ChevronDown, ChevronRight, Trash2, FolderDown } from 'lucide-react';
 import { toast } from 'sonner';
-import { apiGet, apiGetBlob, apiGetText, apiPut, downloadBackupDate, deleteBackupDate } from '@/lib/api';
+import { apiGet, apiGetBlob, apiGetText, apiPut, downloadBackupDate, deleteBackupDate, downloadActiveBackups } from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -140,6 +140,7 @@ export function BackupsPage() {
   const [activeBackups, setActiveBackups] = useState<ActiveBackup[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeLoading, setActiveLoading] = useState(false);
+  const [activeBatchLoading, setActiveBatchLoading] = useState(false);
 
   // Filters
   const [deviceFilter, setDeviceFilter] = useState('All');
@@ -386,6 +387,27 @@ export function BackupsPage() {
     }
   };
 
+  const handleDownloadActiveBatch = async () => {
+    setActiveBatchLoading(true);
+    try {
+      const blob = await downloadActiveBackups();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `active_backups_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('Successfully downloaded active backups batch');
+    } catch (err: unknown) {
+      const msg = (err && typeof err === 'object' && 'message' in err) ? (err as { message?: string }).message : String(err);
+      toast.error('Failed to download active backups: ' + (msg || 'Unknown error'));
+    } finally {
+      setActiveBatchLoading(false);
+    }
+  };
+
   // Group filteredBackups by Date (YYYY-MM-DD from local timezone)
   const groupedBackups = filteredBackups.reduce((groups: Record<string, Backup[]>, backup) => {
     const d = new Date(backup.timestamp);
@@ -414,10 +436,26 @@ export function BackupsPage() {
 
       {/* ── Tabel 1: Active Backups ── */}
       <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Star className="w-4 h-4 text-amber-500" />
-          <h3 className="text-base font-semibold text-gray-800">Active Backup</h3>
-          <span className="text-xs text-gray-500">(1 per device — config's references)</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Star className="w-4 h-4 text-amber-500" />
+            <h3 className="text-base font-semibold text-gray-800">Active Backup</h3>
+            <span className="text-xs text-gray-500">(1 per device — config's references)</span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            disabled={activeBatchLoading || activeBackups.length === 0}
+            onClick={handleDownloadActiveBatch}
+          >
+            {activeBatchLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <FolderDown className="w-4 h-4 text-blue-600" />
+            )}
+            <span className="hidden sm:inline">Download Active Batch</span>
+          </Button>
         </div>
 
         <div className="border rounded-lg bg-white">
