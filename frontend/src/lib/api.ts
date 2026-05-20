@@ -9,29 +9,32 @@ function getAuthHeader() {
   return { Authorization: `Bearer ${token}` };
 }
 
+function handleUnauthorized() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem("abs_token");
+  localStorage.removeItem("abs_user");
+  window.location.replace("/login");
+}
+
+async function parseError(res: Response, fallback: string): Promise<string> {
+  try {
+    const data = await res.json();
+    return data.detail || data.message || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export async function apiGet<T>(path: string, withAuth = true): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  if (withAuth) {
-    Object.assign(headers, getAuthHeader());
-  }
+  if (withAuth) Object.assign(headers, getAuthHeader());
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: "GET",
-    headers,
-  });
+  const res = await fetch(`${API_BASE}${path}`, { method: "GET", headers });
 
-  if (!res.ok) {
-    let errorMessage = `GET ${path} failed (${res.status})`;
-    try {
-      const errorData = await res.json();
-      errorMessage = errorData.detail || errorData.message || errorMessage;
-    } catch (e) {
-      // If JSON parsing fails, keep default message
-    }
-    throw new Error(errorMessage);
-  }
+  if (res.status === 401) { handleUnauthorized(); throw new Error("Session expired"); }
+  if (!res.ok) throw new Error(await parseError(res, `GET ${path} failed (${res.status})`));
 
   return res.json() as Promise<T>;
 }
@@ -54,16 +57,8 @@ export async function apiPost<TReq, TRes>(
     body: JSON.stringify(body),
   });
 
-  if (!res.ok) {
-    let errorMessage = `POST ${path} failed (${res.status})`;
-    try {
-      const errorData = await res.json();
-      errorMessage = errorData.detail || errorData.message || errorMessage;
-    } catch (e) {
-      // If JSON parsing fails, keep default message
-    }
-    throw new Error(errorMessage);
-  }
+  if (res.status === 401) { handleUnauthorized(); throw new Error("Session expired"); }
+  if (!res.ok) throw new Error(await parseError(res, `POST ${path} failed (${res.status})`));
 
   return res.json() as Promise<TRes>;
 }
@@ -74,22 +69,10 @@ export async function apiPut<TReq, TRes>(path: string, body: TReq, withAuth = tr
   };
   if (withAuth) Object.assign(headers, getAuthHeader());
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: "PUT",
-    headers,
-    body: JSON.stringify(body),
-  });
+  const res = await fetch(`${API_BASE}${path}`, { method: "PUT", headers, body: JSON.stringify(body) });
 
-  if (!res.ok) {
-    let errorMessage = `PUT ${path} failed (${res.status})`;
-    try {
-      const errorData = await res.json();
-      errorMessage = errorData.detail || errorData.message || errorMessage;
-    } catch (e) {
-      // If JSON parsing fails, keep default message
-    }
-    throw new Error(errorMessage);
-  }
+  if (res.status === 401) { handleUnauthorized(); throw new Error("Session expired"); }
+  if (!res.ok) throw new Error(await parseError(res, `PUT ${path} failed (${res.status})`));
 
   return res.json() as Promise<TRes>;
 }
@@ -103,16 +86,8 @@ export async function apiDelete(path: string, withAuth = true): Promise<void> {
     headers,
   });
 
-  if (!res.ok) {
-    let errorMessage = `DELETE ${path} failed (${res.status})`;
-    try {
-      const errorData = await res.json();
-      errorMessage = errorData.detail || errorData.message || errorMessage;
-    } catch (e) {
-      // If JSON parsing fails, keep default message
-    }
-    throw new Error(errorMessage);
-  }
+  if (res.status === 401) { handleUnauthorized(); throw new Error("Session expired"); }
+  if (!res.ok) throw new Error(await parseError(res, `DELETE ${path} failed (${res.status})`));
 }
 
 // Download helpers
@@ -120,11 +95,9 @@ export async function apiGetBlob(path: string, withAuth = true): Promise<Blob> {
   const headers: Record<string, string> = {};
   if (withAuth) Object.assign(headers, getAuthHeader());
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: 'GET',
-    headers,
-  });
+  const res = await fetch(`${API_BASE}${path}`, { method: 'GET', headers });
 
+  if (res.status === 401) { handleUnauthorized(); throw new Error("Session expired"); }
   if (!res.ok) {
     const text = await res.text();
     throw new Error(text || `GET ${path} failed (${res.status})`);
@@ -142,6 +115,7 @@ export async function apiGetText(path: string, withAuth = true): Promise<string>
     headers,
   });
 
+  if (res.status === 401) { handleUnauthorized(); throw new Error("Session expired"); }
   if (!res.ok) {
     const text = await res.text();
     throw new Error(text || `GET ${path} failed (${res.status})`);
