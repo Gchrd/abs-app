@@ -1,6 +1,19 @@
+"use client";
 // src/app/page.tsx
-import { redirect } from "next/navigation";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function RootPage() {
-  redirect("/login");
+  const router = useRouter();
+
+  useEffect(() => {
+    const token = localStorage.getItem("abs_token");
+    if (token) {
+      router.replace("/dashboard");
+    } else {
+      router.replace("/login");
+    }
+  }, [router]);
+
+  return null;
 }
