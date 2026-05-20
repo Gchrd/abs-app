@@ -151,6 +151,12 @@ def _connect_ssh_normal(
         "port": port,
         "session_log": session_log,
         "fast_cli": False,
+        # Fix: support MikroTik & perangkat lama yang pakai algoritma SSH lama (ssh-rsa)
+        # Paramiko versi baru memblokir algoritma ini by default
+        "disabled_algorithms": {
+            "pubkeys": ["rsa-sha2-256", "rsa-sha2-512"],
+        },
+        "conn_timeout": 30,
     }
 
     conn = ConnectHandler(**device)
