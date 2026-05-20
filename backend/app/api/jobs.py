@@ -35,42 +35,53 @@ async def run_manual(db: Session = Depends(get_db), current_user=Depends(require
             log_lines.append(f"Job started at {job.started_at.isoformat()}")
             log_lines.append(f"Processing {len(device_list)} enabled device(s)...")
             
+            max_attempts = 4
+            retry_delays = [15, 30, 60]
+
             for idx, device_info in enumerate(device_list):
-                try:
-                    log_lines.append(f"[{device_info['hostname']}] Connecting to {device_info['ip']}...")
-                    
-                    # Fetch running config
-                    path, content = fetch_running_config(
-                        vendor=device_info['vendor'], 
-                        host=device_info['ip'], 
-                        username=device_info['username'],
-                        password=device_info['password'], 
-                        secret=device_info['secret'],
-                        protocol=device_info['protocol'], 
-                        port=device_info['port']
-                    )
-                    
-                    # Save backup record
-                    b = Backup(
-                        device_id=device_info['id'], 
-                        size_bytes=len(content),
-                        hash=sha256(content).hexdigest()[:8], 
-                        path=str(path)
-                    )
-                    db.add(b)
-                    ok += 1
-                    db.commit()
-                    log_lines.append(f"[{device_info['hostname']}] Backup success ({len(content)} bytes, path={path})")
-                    
-                    # Delay between devices (rate limiting)
-                    if idx < len(device_list) - 1:
-                        log_lines.append(f"[{device_info['hostname']}] Waiting 3s before next device...")
-                        await asyncio.sleep(3)
-                    
-                except Exception as e:
-                    log_lines.append(f"[{device_info['hostname']}] Backup failed: {str(e)}")
-                    if idx < len(device_list) - 1:
-                        await asyncio.sleep(2)
+                for attempt in range(max_attempts):
+                    try:
+                        if attempt == 0:
+                            log_lines.append(f"[{device_info['hostname']}] Connecting to {device_info['ip']}...")
+                        else:
+                            log_lines.append(f"[{device_info['hostname']}] Mencoba backup ulang...")
+
+                        # Fetch running config
+                        path, content = fetch_running_config(
+                            vendor=device_info['vendor'], 
+                            host=device_info['ip'], 
+                            username=device_info['username'],
+                            password=device_info['password'], 
+                            secret=device_info['secret'],
+                            protocol=device_info['protocol'], 
+                            port=device_info['port']
+                        )
+                        
+                        # Save backup record
+                        b = Backup(
+                            device_id=device_info['id'], 
+                            size_bytes=len(content),
+                            hash=sha256(content).hexdigest()[:8], 
+                            path=str(path)
+                        )
+                        db.add(b)
+                        ok += 1
+                        db.commit()
+                        log_lines.append(f"[{device_info['hostname']}] Backup success ({len(content)} bytes, path={path})")
+                        break  # Success, exit retry loop
+
+                    except Exception as e:
+                        if attempt < max_attempts - 1:
+                            log_lines.append(f"[{device_info['hostname']}] Backup gagal... ({str(e)})")
+                            delay = retry_delays[attempt]
+                            await asyncio.sleep(delay)
+                        else:
+                            log_lines.append(f"[{device_info['hostname']}] Backup failed: ({str(e)})")
+
+                # Delay between devices (rate limiting)
+                if idx < len(device_list) - 1:
+                    log_lines.append(f"[{device_info['hostname']}] Waiting 3s before next device...")
+                    await asyncio.sleep(3)
             
             # Update job status
             from datetime import datetime
