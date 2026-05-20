@@ -190,7 +190,9 @@ def acknowledge_backup(backup_id: int, current_user=Depends(require_admin), db: 
 
 @router.get("/diff")
 def get_diff(current: int, previous: int, current_user=Depends(get_current_user), db: Session = Depends(get_db)):
-    """Return the raw text of two backup files for diff comparison in the frontend."""
+    """Return sanitized text of two backup files for diff comparison in the frontend."""
+    from ..utils.config_sanitizer import sanitize_config
+
     b_current = db.get(Backup, current)
     b_previous = db.get(Backup, previous)
 
@@ -199,18 +201,25 @@ def get_diff(current: int, previous: int, current_user=Depends(get_current_user)
     if not b_previous:
         raise HTTPException(404, f"Backup #{previous} not found")
 
-    def read_file(path: str) -> str:
+    def read_file(path: str, vendor: str) -> str:
         p = Path(path)
         if not p.exists():
             return "(File not found on disk)"
         try:
-            return p.read_text(encoding="utf-8", errors="replace")
+            raw = p.read_text(encoding="utf-8", errors="replace")
+            return sanitize_config(raw, vendor=vendor)
         except Exception as e:
             return f"(Error reading file: {e})"
 
+    # Get vendor from device for sanitization
+    dev_current = db.get(Device, b_current.device_id)
+    dev_previous = db.get(Device, b_previous.device_id)
+    vendor_current = dev_current.vendor if dev_current else "cisco_ios"
+    vendor_previous = dev_previous.vendor if dev_previous else "cisco_ios"
+
     return {
-        "current": read_file(b_current.path),
-        "previous": read_file(b_previous.path),
+        "current": read_file(b_current.path, vendor_current),
+        "previous": read_file(b_previous.path, vendor_previous),
         "current_backup_id": b_current.id,
         "previous_backup_id": b_previous.id,
     }
