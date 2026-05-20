@@ -42,9 +42,10 @@ def sanitize_config(content: str, vendor: str = 'cisco_ios') -> str:
     """
     Generic sanitizer wrapper. Dispatches to specific vendor logic.
     """
-    if vendor == 'cisco_ios':
+    vendor_lower = vendor.lower() if vendor else ""
+    if 'cisco' in vendor_lower:
         return sanitize_cisco_ios(content)
-    elif 'mikrotik' in vendor:  # Handle mikrotik_routeros and variants
+    elif 'mikrotik' in vendor_lower:  # Handle mikrotik_routeros and variants
         return sanitize_mikrotik_routeros(content)
     
     # Default: return content as-is
