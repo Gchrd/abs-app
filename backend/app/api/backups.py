@@ -266,8 +266,13 @@ def download_backup_batch(batch_id: str, db: Session = Depends(get_db), current_
     """
     Download a ZIP file containing all backups for the specified batch_id (or legacy date YYYY-MM-DD).
     """
+    # Support legacy_ prefix sent by frontend for old backups
+    lookup_id = batch_id
+    if batch_id.startswith("legacy_"):
+        lookup_id = batch_id[len("legacy_"):]
+
     try:
-        target_date = datetime.strptime(batch_id, "%Y-%m-%d").date()
+        target_date = datetime.strptime(lookup_id, "%Y-%m-%d").date()
         is_legacy = True
     except ValueError:
         is_legacy = False
@@ -309,8 +314,13 @@ def delete_backup_batch(batch_id: str, db: Session = Depends(get_db), current_us
     """
     Deletes all backups for a specific batch_id (or legacy date YYYY-MM-DD), but ONLY if none of them are marked as active/locked.
     """
+    # Support legacy_ prefix sent by frontend for old backups
+    lookup_id = batch_id
+    if batch_id.startswith("legacy_"):
+        lookup_id = batch_id[len("legacy_"):]
+
     try:
-        target_date = datetime.strptime(batch_id, "%Y-%m-%d").date()
+        target_date = datetime.strptime(lookup_id, "%Y-%m-%d").date()
         is_legacy = True
     except ValueError:
         is_legacy = False
