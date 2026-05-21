@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Download, Search, GitCompare, Star, Loader2, ChevronDown, ChevronRight, Trash2, FolderDown, RefreshCw } from 'lucide-react';
+import { Eye, Download, Search, GitCompare, Star, Loader2, ChevronDown, ChevronRight, Trash2, FolderDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiGet, apiGetBlob, apiGetText, apiPut, apiPost, downloadBackupBatch, deleteBackupBatch, downloadActiveBackups } from '@/lib/api';
 
@@ -590,24 +590,6 @@ export function BackupsPage() {
                 <FolderDown className="w-4 h-4 text-blue-600" />
               )}
               <span className="hidden sm:inline">Download Active Batch</span>
-            </Button>
-            {isAdmin && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2 text-purple-600 border-purple-300 hover:bg-purple-50"
-                disabled={recalculateLoading}
-                onClick={handleRecalculateHashes}
-                title="Fix false-positive 'Changed' statuses by recalculating all hashes from disk"
-              >
-                {recalculateLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="w-4 h-4" />
-                )}
-                <span className="hidden sm:inline">Fix Hashes</span>
-              </Button>
-            )}
           </div>
         </div>
 
