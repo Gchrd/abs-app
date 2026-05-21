@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Download, Search, GitCompare, Star, Loader2, ChevronDown, ChevronRight, Trash2, FolderDown } from 'lucide-react';
+import { Eye, Download, Search, GitCompare, Star, Loader2, ChevronDown, ChevronRight, Trash2, FolderDown, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiGet, apiGetBlob, apiGetText, apiPut, apiPost, downloadBackupBatch, deleteBackupBatch, downloadActiveBackups } from '@/lib/api';
 
@@ -182,6 +182,7 @@ export function BackupsPage() {
   const [batchActionLoading, setBatchActionLoading] = useState<string | null>(null);
   const [batchAcknowledgeLoading, setBatchAcknowledgeLoading] = useState(false);
   const [batchAcceptLatestLoading, setBatchAcceptLatestLoading] = useState(false);
+  const [recalculateLoading, setRecalculateLoading] = useState(false);
 
   // Role check
   const u = typeof window !== 'undefined' ? localStorage.getItem('abs_user') : null;
@@ -476,6 +477,29 @@ export function BackupsPage() {
     }
   };
 
+  const handleRecalculateHashes = async () => {
+    if (!confirm(
+      'Recalculate all backup hashes from disk?\n\nThis will fix false-positive "Changed" statuses caused by \\r\\n vs \\n line-ending inconsistencies. Run this once after updating the system.'
+    )) return;
+    setRecalculateLoading(true);
+    try {
+      const res = await apiPost<{}, { message: string; updated: number; skipped: number; errors: string[] }>(
+        '/backups/recalculate-hashes',
+        {}
+      );
+      toast.success(`${res.message} Updated: ${res.updated}, Skipped: ${res.skipped}${
+        res.errors.length ? `, Errors: ${res.errors.length}` : ''
+      }`);
+      await Promise.all([fetchBackups(), fetchActiveBackups()]);
+    } catch (err: unknown) {
+      const msg = (err && typeof err === 'object' && 'message' in err) ? (err as { message?: string }).message : String(err);
+      toast.error('Failed to recalculate hashes: ' + (msg || 'Unknown error'));
+    } finally {
+      setRecalculateLoading(false);
+    }
+  };
+
+
   // Group filteredBackups into BatchGroups
   const groupedBatches = useMemo(() => {
     const groups: Record<string, Backup[]> = {};
@@ -591,6 +615,23 @@ export function BackupsPage() {
               )}
               <span className="hidden sm:inline">Download Active Batch</span>
             </Button>
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 text-purple-600 border-purple-300 hover:bg-purple-50"
+                disabled={recalculateLoading}
+                onClick={handleRecalculateHashes}
+                title="Fix false-positive 'Changed' statuses by recalculating all hashes from disk"
+              >
+                {recalculateLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+                <span className="hidden sm:inline">Fix Hashes</span>
+              </Button>
+            )}
           </div>
         </div>
 
