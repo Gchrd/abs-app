@@ -36,6 +36,7 @@ async def run_scheduled_backup(schedule_id: int, schedule_name: str):
         db.refresh(job)
         
         job_id = job.id  # Extract job_id before session operations
+        batch_id = f"sched_{schedule_id}_{tznow().strftime('%Y%m%d_%H%M%S')}"
         
         log_lines = []
         log_lines.append(f"Scheduled job started at {job.started_at.isoformat()}")
@@ -120,7 +121,8 @@ async def run_scheduled_backup(schedule_id: int, schedule_name: str):
                         device_id=device_info['id'], 
                         size_bytes=len(content),
                         hash=clean_hash, 
-                        path=str(path)
+                        path=str(path),
+                        batch_id=batch_id
                     )
                     db.add(b)
                     ok += 1

@@ -84,7 +84,7 @@ def admin_token(client):
     Get a valid admin token for testing protected routes.
     """
     response = client.post(
-        "/auth/token",
+        "/login",
         json={"username": "testadmin", "password": "admin123"}
     )
     assert response.status_code == 200
@@ -97,7 +97,7 @@ def viewer_token(client):
     Get a valid viewer token for testing protected routes.
     """
     response = client.post(
-        "/auth/token",
+        "/login",
         json={"username": "testviewer", "password": "viewer123"}
     )
     assert response.status_code == 200

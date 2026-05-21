@@ -32,6 +32,7 @@ def list_backups(current_user=Depends(get_current_user), db: Session = Depends(g
             "hash": b.hash,
             "status": b.status,
             "path": b.path,
+            "batch_id": b.batch_id,
         })
     return out
 
@@ -260,22 +261,24 @@ def delete_backup(backup_id: int, db: Session = Depends(get_db), current_user=De
     return {"message": "Backup deleted successfully"}
 
 
-@router.get("/download-date/{date_str}")
-def download_backup_date(date_str: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+@router.get("/download-batch/{batch_id}")
+def download_backup_batch(batch_id: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     """
-    Download a ZIP file containing all backups for the specified date (YYYY-MM-DD).
+    Download a ZIP file containing all backups for the specified batch_id (or legacy date YYYY-MM-DD).
     """
     try:
-        target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        target_date = datetime.strptime(batch_id, "%Y-%m-%d").date()
+        is_legacy = True
     except ValueError:
-        raise HTTPException(400, "Invalid date format, expected YYYY-MM-DD")
+        is_legacy = False
 
-    # Get backups where timestamp cast to date matches the target date
-    # Compatible with SQLite via func.date
-    backups = db.query(Backup).filter(func.date(Backup.timestamp) == target_date.isoformat()).all()
+    if is_legacy:
+        backups = db.query(Backup).filter(func.date(Backup.timestamp) == target_date.isoformat()).all()
+    else:
+        backups = db.query(Backup).filter(Backup.batch_id == batch_id).all()
     
     if not backups:
-        raise HTTPException(404, f"No backups found for date {date_str}")
+        raise HTTPException(404, f"No backups found for batch {batch_id}")
 
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
@@ -293,36 +296,39 @@ def download_backup_date(date_str: str, db: Session = Depends(get_db), current_u
                 
     zip_buffer.seek(0)
     
-    audit_event(user=current_user.username, action="backup_download_batch", target=f"date: {date_str}", result=f"success ({len(backups)} files)")
+    audit_event(user=current_user.username, action="backup_download_batch", target=f"batch: {batch_id}", result=f"success ({len(backups)} files)")
     
     return StreamingResponse(
         zip_buffer,
         media_type="application/zip",
-        headers={"Content-Disposition": f"attachment; filename=backups_{date_str}.zip"}
+        headers={"Content-Disposition": f"attachment; filename=backups_{batch_id}.zip"}
     )
 
-@router.delete("/date/{date_str}")
-def delete_backup_date(date_str: str, db: Session = Depends(get_db), current_user=Depends(require_admin)):
+@router.delete("/batch/{batch_id}")
+def delete_backup_batch(batch_id: str, db: Session = Depends(get_db), current_user=Depends(require_admin)):
     """
-    Deletes all backups for a specific date (YYYY-MM-DD), but ONLY if none of them are marked as active/locked.
+    Deletes all backups for a specific batch_id (or legacy date YYYY-MM-DD), but ONLY if none of them are marked as active/locked.
     """
     try:
-        target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        target_date = datetime.strptime(batch_id, "%Y-%m-%d").date()
+        is_legacy = True
     except ValueError:
-        raise HTTPException(400, "Invalid date format, expected YYYY-MM-DD")
+        is_legacy = False
 
-    backups = db.query(Backup).filter(func.date(Backup.timestamp) == target_date.isoformat()).all()
+    if is_legacy:
+        backups = db.query(Backup).filter(func.date(Backup.timestamp) == target_date.isoformat()).all()
+    else:
+        backups = db.query(Backup).filter(Backup.batch_id == batch_id).all()
     
     if not backups:
-        raise HTTPException(404, f"No backups found for date {date_str}")
+        raise HTTPException(404, f"No backups found for batch {batch_id}")
 
-    # Validation: Check if ANY backup in this date is active or acknowledged
-    # This prevents deleting backups that are currently set as the "reference"
+    # Validation: Check if ANY backup in this batch/date is active or acknowledged
     for b in backups:
         dev = db.get(Device, b.device_id)
         if dev:
             if dev.active_backup_id == b.id or dev.last_ack_backup_id == b.id:
-                raise HTTPException(403, f"Cannot delete date {date_str} because backup ID {b.id} is currently locked/active for device {dev.hostname}.")
+                raise HTTPException(403, f"Cannot delete batch {batch_id} because backup ID {b.id} is currently locked/active for device {dev.hostname}.")
 
     deleted_count = 0
     for b in backups:
@@ -339,8 +345,8 @@ def delete_backup_date(date_str: str, db: Session = Depends(get_db), current_use
 
     db.commit()
     
-    audit_event(user=current_user.username, action="backup_delete_batch", target=f"date: {date_str}", result=f"success (deleted {deleted_count} backups)")
-    return {"message": f"Successfully deleted {deleted_count} backups for date {date_str}"}
+    audit_event(user=current_user.username, action="backup_delete_batch", target=f"batch: {batch_id}", result=f"success (deleted {deleted_count} backups)")
+    return {"message": f"Successfully deleted {deleted_count} backups for batch {batch_id}"}
 
 
 @router.post("/acknowledge-all")

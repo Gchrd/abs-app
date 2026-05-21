@@ -5,8 +5,18 @@ from .database import Base, engine
 from .api import devices, jobs, backups
 from .services import scheduler
 from .routers import users as users_router, schedules as schedules_router, audit as audit_router, auth as auth_router
+from sqlalchemy import text, inspect
 
 Base.metadata.create_all(bind=engine)
+
+def run_migrations():
+    inspector = inspect(engine)
+    columns = [col['name'] for col in inspector.get_columns('backups')]
+    if "batch_id" not in columns:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE backups ADD COLUMN batch_id VARCHAR(128)"))
+
+run_migrations()
 
 app = FastAPI(title="ABS Backend")
 app.add_middleware(

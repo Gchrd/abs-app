@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Eye, Download, Search, GitCompare, Star, Loader2, ChevronDown, ChevronRight, Trash2, FolderDown } from 'lucide-react';
 import { toast } from 'sonner';
-import { apiGet, apiGetBlob, apiGetText, apiPut, apiPost, downloadBackupDate, deleteBackupDate, downloadActiveBackups } from '@/lib/api';
+import { apiGet, apiGetBlob, apiGetText, apiPut, apiPost, downloadBackupBatch, deleteBackupBatch, downloadActiveBackups } from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -21,7 +21,15 @@ interface Backup {
   hash: string;
   status: string;
   device_name?: string;
+  batch_id?: string | null;
   content?: string;
+}
+
+interface BatchGroup {
+  id: string;
+  label: string;
+  timestamp: string;
+  backups: Backup[];
 }
 
 interface ActiveBackup {
@@ -168,8 +176,8 @@ export function BackupsPage() {
   const [revertingId, setRevertingId] = useState<number | null>(null);
 
   // History Grouping & Batch Actions
-  const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
-  const [deletingDate, setDeletingDate] = useState<string | null>(null);
+  const [expandedBatches, setExpandedBatches] = useState<Record<string, boolean>>({});
+  const [deletingBatchId, setDeletingBatchId] = useState<string | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [batchActionLoading, setBatchActionLoading] = useState<string | null>(null);
   const [batchAcknowledgeLoading, setBatchAcknowledgeLoading] = useState(false);
@@ -357,43 +365,43 @@ export function BackupsPage() {
     }
   };
 
-  const toggleDate = (date: string) => {
-    setExpandedDates(prev => ({ ...prev, [date]: !prev[date] }));
+  const toggleBatch = (batchId: string) => {
+    setExpandedBatches(prev => ({ ...prev, [batchId]: !prev[batchId] }));
   };
 
-  const handleDownloadDate = async (date: string) => {
-    setBatchActionLoading(`download-${date}`);
+  const handleDownloadBatch = async (batchId: string) => {
+    setBatchActionLoading(`download-${batchId}`);
     try {
-      const blob = await downloadBackupDate(date);
+      const blob = await downloadBackupBatch(batchId);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `backups_${date}.zip`;
+      a.download = `backups_${batchId}.zip`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast.success(`Successfully downloaded backup folder for ${date}`);
+      toast.success('Successfully downloaded backup batch');
     } catch (err: unknown) {
       const msg = (err && typeof err === 'object' && 'message' in err) ? (err as { message?: string }).message : String(err);
-      toast.error('Failed to download folder: ' + (msg || 'Unknown error'));
+      toast.error('Failed to download batch: ' + (msg || 'Unknown error'));
     } finally {
       setBatchActionLoading(null);
     }
   };
 
-  const handleDeleteDate = async () => {
-    if (!deletingDate) return;
-    setBatchActionLoading(`delete-${deletingDate}`);
+  const handleDeleteBatch = async () => {
+    if (!deletingBatchId) return;
+    setBatchActionLoading(`delete-${deletingBatchId}`);
     try {
-      await deleteBackupDate(deletingDate);
-      toast.success(`Successfully deleted backup folder for ${deletingDate}`);
-      setDeletingDate(null);
+      await deleteBackupBatch(deletingBatchId);
+      toast.success('Successfully deleted backup batch');
+      setDeletingBatchId(null);
       setDeleteConfirmText('');
       fetchBackups(); // Refresh data
     } catch (err: unknown) {
       const msg = (err && typeof err === 'object' && 'message' in err) ? (err as { message?: string }).message : String(err);
-      toast.error('Failed to delete folder: ' + (msg || 'Unknown error'));
+      toast.error('Failed to delete batch: ' + (msg || 'Unknown error'));
     } finally {
       setBatchActionLoading(null);
     }
@@ -468,22 +476,56 @@ export function BackupsPage() {
     }
   };
 
-  // Group filteredBackups by Date (YYYY-MM-DD from local timezone)
-  const groupedBackups = filteredBackups.reduce((groups: Record<string, Backup[]>, backup) => {
-    const d = new Date(backup.timestamp);
-    // Use local timezone formatting for grouping to avoid UTC shift
-    // padStart handles single digit months/days natively
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    const dateKey = `${yyyy}-${mm}-${dd}`;
-    if (!groups[dateKey]) groups[dateKey] = [];
-    groups[dateKey].push(backup);
-    return groups;
-  }, {});
-
-  // Sort dates descending
-  const sortedDates = Object.keys(groupedBackups).sort((a, b) => b.localeCompare(a));
+  // Group filteredBackups into BatchGroups
+  const groupedBatches = useMemo(() => {
+    const groups: Record<string, Backup[]> = {};
+    
+    filteredBackups.forEach(backup => {
+      let key = backup.batch_id;
+      if (!key) {
+        const d = new Date(backup.timestamp);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        key = `legacy_${yyyy}-${mm}-${dd}`;
+      }
+      
+      if (!groups[key]) {
+        groups[key] = [];
+      }
+      groups[key].push(backup);
+    });
+    
+    const batchGroups: BatchGroup[] = Object.entries(groups).map(([id, backups]) => {
+      const sortedBackups = [...backups].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      const representativeTimestamp = sortedBackups[0]?.timestamp || new Date().toISOString();
+      
+      let label = '';
+      if (id.startsWith('legacy_')) {
+        const dateStr = id.replace('legacy_', '');
+        const d = new Date(dateStr);
+        label = `Backup Tanggal - ${d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+      } else if (id.startsWith('manual_')) {
+        const d = new Date(representativeTimestamp);
+        label = `Manual Backup - ${d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} ${d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`;
+      } else if (id.startsWith('sched_')) {
+        const d = new Date(representativeTimestamp);
+        label = `Scheduled Backup - ${d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} ${d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`;
+      } else {
+        const d = new Date(representativeTimestamp);
+        label = `Backup Sesi - ${d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} ${d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`;
+      }
+      
+      return {
+        id,
+        label,
+        timestamp: representativeTimestamp,
+        backups: sortedBackups
+      };
+    });
+    
+    return batchGroups.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }, [filteredBackups]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -681,33 +723,30 @@ export function BackupsPage() {
                 <p className="text-gray-500">Loading backups...</p>
               </div>
             </div>
-          ) : sortedDates.length === 0 ? (
+          ) : groupedBatches.length === 0 ? (
             <div className="flex items-center justify-center py-12 border rounded-lg">
               <p className="text-gray-500">No backups found</p>
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              {sortedDates.map((dateKey) => {
-                const dayBackups = groupedBackups[dateKey];
-                const isExpanded = expandedDates[dateKey] || false;
-                // Cek apakah ada yg active
+              {groupedBatches.map((batch) => {
+                const dayBackups = batch.backups;
+                const isExpanded = expandedBatches[batch.id] || false;
                 const hasActiveBackup = dayBackups.some(b => activeBackups.some(ab => ab.backup_id === b.id));
-                const d = new Date(dateKey);
-                const displayDate = d.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
                 return (
-                  <div key={dateKey} className="border rounded-lg overflow-hidden bg-white shadow-sm">
+                  <div key={batch.id} className="border rounded-lg overflow-hidden bg-white shadow-sm">
                     {/* Header bar */}
                     <div
                       className={`flex items-center justify-between p-3 cursor-pointer ${isExpanded ? 'bg-gray-50 border-b' : 'hover:bg-gray-50'}`}
-                      onClick={() => toggleDate(dateKey)}
+                      onClick={() => toggleBatch(batch.id)}
                     >
                       <div className="flex items-center gap-3 flex-1">
                         <span className="text-gray-400">
                           {isExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
                         </span>
                         <div className="flex flex-col">
-                          <span className="font-semibold text-gray-800">{displayDate}</span>
+                          <span className="font-semibold text-gray-800">{batch.label}</span>
                           <span className="text-xs text-gray-500">{dayBackups.length} backup file{dayBackups.length > 1 ? 's' : ''}</span>
                         </div>
                         {hasActiveBackup && (
@@ -724,10 +763,10 @@ export function BackupsPage() {
                           variant="outline"
                           size="sm"
                           className="gap-2"
-                          disabled={batchActionLoading === `download-${dateKey}`}
-                          onClick={() => handleDownloadDate(dateKey)}
+                          disabled={batchActionLoading === `download-${batch.id}`}
+                          onClick={() => handleDownloadBatch(batch.id)}
                         >
-                          {batchActionLoading === `download-${dateKey}` ? (
+                          {batchActionLoading === `download-${batch.id}` ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
                           ) : (
                             <FolderDown className="w-4 h-4 text-blue-600" />
@@ -740,7 +779,7 @@ export function BackupsPage() {
                             variant="outline"
                             size="sm"
                             className="gap-2 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
-                            onClick={() => setDeletingDate(dateKey)}
+                            onClick={() => setDeletingBatchId(batch.id)}
                           >
                             <Trash2 className="w-4 h-4" />
                             <span className="hidden sm:inline">Delete Folder</span>
@@ -958,7 +997,7 @@ export function BackupsPage() {
       </Dialog>
 
       {/* ── Dialog Konfirmasi Delete Folder ── */}
-      <Dialog open={deletingDate !== null} onOpenChange={(open) => !open && setDeletingDate(null)}>
+      <Dialog open={deletingBatchId !== null} onOpenChange={(open) => !open && setDeletingBatchId(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
@@ -968,13 +1007,13 @@ export function BackupsPage() {
           </DialogHeader>
           <div className="py-4 space-y-4">
             <p className="text-sm text-gray-600">
-              You are about to permanently delete all backup configuration files on <strong>{deletingDate && new Date(deletingDate).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong>.
+              You are about to permanently delete all backup configuration files in <strong>{deletingBatchId && (groupedBatches.find(b => b.id === deletingBatchId)?.label || deletingBatchId)}</strong>.
             </p>
             <div className="bg-red-50 border border-red-200 text-red-800 p-3 rounded text-sm">
               <p className="font-semibold mb-1">Warning!</p>
               <ul className="list-disc pl-5 space-y-1">
                 <li>This action cannot be undone.</li>
-                <li>All history and physical config files in the database and server for today will be deleted.</li>
+                <li>All history and physical config files in the database and server for this batch will be deleted.</li>
               </ul>
             </div>
             <div className="space-y-2 pt-2">
@@ -989,16 +1028,16 @@ export function BackupsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setDeletingDate(null); setDeleteConfirmText(''); }}>
+            <Button variant="outline" onClick={() => { setDeletingBatchId(null); setDeleteConfirmText(''); }}>
               Cancel
             </Button>
             <Button
               variant="destructive"
-              disabled={deleteConfirmText !== "I am sure" || batchActionLoading === `delete-${deletingDate}`}
-              onClick={handleDeleteDate}
+              disabled={deleteConfirmText !== "I am sure" || batchActionLoading === `delete-${deletingBatchId}`}
+              onClick={handleDeleteBatch}
               className="gap-2"
             >
-              {batchActionLoading === `delete-${deletingDate}` ? (
+              {batchActionLoading === `delete-${deletingBatchId}` ? (
                 <><Loader2 className="w-4 h-4 animate-spin" /> Deleting...</>
               ) : (
                 <><Trash2 className="w-4 h-4" /> Yes, Delete Permanently</>

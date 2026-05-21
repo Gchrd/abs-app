@@ -47,6 +47,7 @@ class Backup(Base):
     hash: Mapped[str] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(String(16), default="success")
     path: Mapped[str] = mapped_column(String(512))
+    batch_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
 class Schedule(Base):
     __tablename__ = "schedules"

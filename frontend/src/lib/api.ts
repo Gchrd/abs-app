@@ -124,13 +124,13 @@ export async function apiGetText(path: string, withAuth = true): Promise<string>
   return res.text();
 }
 
-// History Backup Date Management
-export async function downloadBackupDate(date: string) {
-  return apiGetBlob(`/backups/download-date/${date}`);
+// History Backup Batch Management
+export async function downloadBackupBatch(batchId: string) {
+  return apiGetBlob(`/backups/download-batch/${batchId}`);
 }
 
-export async function deleteBackupDate(date: string) {
-  return apiDelete(`/backups/date/${date}`);
+export async function deleteBackupBatch(batchId: string) {
+  return apiDelete(`/backups/batch/${batchId}`);
 }
 
 export async function downloadActiveBackups() {

@@ -11,12 +11,12 @@ from fastapi import status
 
 
 class TestAuthToken:
-    """Tests for POST /auth/token endpoint."""
+    """Tests for POST /login endpoint."""
     
     def test_login_with_valid_admin_credentials(self, client):
         """Test successful login with valid admin credentials."""
         response = client.post(
-            "/auth/token",
+            "/login",
             json={"username": "testadmin", "password": "admin123"}
         )
         
@@ -32,7 +32,7 @@ class TestAuthToken:
     def test_login_with_valid_viewer_credentials(self, client):
         """Test successful login with valid viewer credentials."""
         response = client.post(
-            "/auth/token",
+            "/login",
             json={"username": "testviewer", "password": "viewer123"}
         )
         
@@ -46,7 +46,7 @@ class TestAuthToken:
     def test_login_with_invalid_username(self, client):
         """Test login fails with non-existent username."""
         response = client.post(
-            "/auth/token",
+            "/login",
             json={"username": "nonexistent", "password": "anypassword"}
         )
         
@@ -56,7 +56,7 @@ class TestAuthToken:
     def test_login_with_invalid_password(self, client):
         """Test login fails with incorrect password."""
         response = client.post(
-            "/auth/token",
+            "/login",
             json={"username": "testadmin", "password": "wrongpassword"}
         )
         
@@ -66,7 +66,7 @@ class TestAuthToken:
     def test_login_with_empty_credentials(self, client):
         """Test login fails with empty credentials."""
         response = client.post(
-            "/auth/token",
+            "/login",
             json={"username": "", "password": ""}
         )
         
@@ -75,7 +75,7 @@ class TestAuthToken:
     def test_login_without_username(self, client):
         """Test login fails when username is missing."""
         response = client.post(
-            "/auth/token",
+            "/login",
             json={"password": "admin123"}
         )
         
@@ -84,7 +84,7 @@ class TestAuthToken:
     def test_login_without_password(self, client):
         """Test login fails when password is missing."""
         response = client.post(
-            "/auth/token",
+            "/login",
             json={"username": "testadmin"}
         )
         
@@ -92,11 +92,11 @@ class TestAuthToken:
 
 
 class TestAuthMe:
-    """Tests for GET /auth/me endpoint."""
+    """Tests for GET /me endpoint."""
     
     def test_get_current_user_with_admin_token(self, client, admin_headers):
         """Test retrieving current user info with valid admin token."""
-        response = client.get("/auth/me", headers=admin_headers)
+        response = client.get("/me", headers=admin_headers)
         
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -105,7 +105,7 @@ class TestAuthMe:
     
     def test_get_current_user_with_viewer_token(self, client, viewer_headers):
         """Test retrieving current user info with valid viewer token."""
-        response = client.get("/auth/me", headers=viewer_headers)
+        response = client.get("/me", headers=viewer_headers)
         
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -113,15 +113,15 @@ class TestAuthMe:
         assert data["role"] == "viewer"
     
     def test_get_current_user_without_token(self, client):
-        """Test GET /auth/me fails without authentication token."""
-        response = client.get("/auth/me")
+        """Test GET /me fails without authentication token."""
+        response = client.get("/me")
         
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
     
     def test_get_current_user_with_invalid_token(self, client):
-        """Test GET /auth/me fails with invalid token."""
+        """Test GET /me fails with invalid token."""
         response = client.get(
-            "/auth/me",
+            "/me",
             headers={"Authorization": "Bearer invalid_token_here"}
         )
         
@@ -129,9 +129,9 @@ class TestAuthMe:
         assert "Invalid token" in response.json()["detail"]
     
     def test_get_current_user_with_malformed_auth_header(self, client):
-        """Test GET /auth/me fails with malformed authorization header."""
+        """Test GET /me fails with malformed authorization header."""
         response = client.get(
-            "/auth/me",
+            "/me",
             headers={"Authorization": "InvalidFormat"}
         )
         
@@ -412,7 +412,7 @@ class TestTokenExpiration:
         expired_token = jwt.encode(expired_payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
         
         response = client.get(
-            "/auth/me",
+            "/me",
             headers={"Authorization": f"Bearer {expired_token}"}
         )
         
@@ -433,7 +433,7 @@ class TestTokenExpiration:
         invalid_token = jwt.encode(invalid_payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
         
         response = client.get(
-            "/auth/me",
+            "/me",
             headers={"Authorization": f"Bearer {invalid_token}"}
         )
         

@@ -32,6 +32,7 @@ async def run_manual(db: Session = Depends(get_db), current_user=Depends(require
             
             log_lines = []
             ok = 0
+            batch_id = f"manual_{job_id}_{tznow().strftime('%Y%m%d_%H%M%S')}"
             
             log_lines.append(f"Job started at {job.started_at.isoformat()}")
             log_lines.append(f"Processing {len(device_list)} enabled device(s)...")
@@ -69,7 +70,8 @@ async def run_manual(db: Session = Depends(get_db), current_user=Depends(require
                             device_id=device_info['id'], 
                             size_bytes=len(content),
                             hash=clean_hash, 
-                            path=str(path)
+                            path=str(path),
+                            batch_id=batch_id
                         )
                         db.add(b)
                         ok += 1
