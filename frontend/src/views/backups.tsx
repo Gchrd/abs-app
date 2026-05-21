@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -106,38 +106,77 @@ function DiffViewer({ current, previous }: { current: string; previous: string }
     return 'text-gray-600';
   };
 
+  // Refs for synced vertical scroll
+  const leftRef = useRef<HTMLDivElement>(null);
+  const rightRef = useRef<HTMLDivElement>(null);
+  const syncingLeft = useRef(false);
+  const syncingRight = useRef(false);
+
+  const handleLeftScroll = () => {
+    if (syncingRight.current) return;
+    syncingLeft.current = true;
+    if (rightRef.current && leftRef.current) {
+      rightRef.current.scrollTop = leftRef.current.scrollTop;
+    }
+    syncingLeft.current = false;
+  };
+
+  const handleRightScroll = () => {
+    if (syncingLeft.current) return;
+    syncingRight.current = true;
+    if (leftRef.current && rightRef.current) {
+      leftRef.current.scrollTop = rightRef.current.scrollTop;
+    }
+    syncingRight.current = false;
+  };
+
   return (
-    <div className="grid grid-cols-2 gap-1 font-mono text-xs max-h-[60vh]">
+    <div className="grid grid-cols-2 gap-1 font-mono text-xs h-full">
       {/* Previous (left) */}
-      <div className="bg-gray-900 rounded-l overflow-auto max-h-[60vh]">
-        <div className="sticky top-0 bg-gray-800 text-gray-400 px-3 py-1 text-xs font-semibold border-b border-gray-700">
+      <div className="bg-gray-900 rounded-l flex flex-col overflow-hidden">
+        <div className="sticky top-0 z-10 bg-gray-800 text-gray-400 px-3 py-1.5 text-xs font-semibold border-b border-gray-700 shrink-0">
           ← Previous
         </div>
-        <div className="min-w-max">
-          {leftLines.map((line, i) => (
-            <div key={i} className={`flex ${bgColor(line.type)}`}>
-              <span className={`select-none w-10 shrink-0 text-right pr-3 py-0.5 border-r border-gray-700 ${lineNumColor(line.type)}`}>
-                {line.text !== '' ? line.lineNo : ''}
-              </span>
-              <span className="px-3 py-0.5 whitespace-pre">{line.text}</span>
-            </div>
-          ))}
+        {/* Scroll: Y shared (via sync), X independent */}
+        <div
+          ref={leftRef}
+          onScroll={handleLeftScroll}
+          className="overflow-auto flex-1"
+        >
+          <div className="min-w-max">
+            {leftLines.map((line, i) => (
+              <div key={i} className={`flex ${bgColor(line.type)}`}>
+                <span className={`select-none w-10 shrink-0 text-right pr-3 py-0.5 border-r border-gray-700 ${lineNumColor(line.type)}`}>
+                  {line.text !== '' ? line.lineNo : ''}
+                </span>
+                <span className="px-3 py-0.5 whitespace-pre">{line.text}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
+
       {/* Current (right) */}
-      <div className="bg-gray-900 rounded-r overflow-auto max-h-[60vh]">
-        <div className="sticky top-0 bg-gray-800 text-gray-400 px-3 py-1 text-xs font-semibold border-b border-gray-700">
+      <div className="bg-gray-900 rounded-r flex flex-col overflow-hidden">
+        <div className="sticky top-0 z-10 bg-gray-800 text-gray-400 px-3 py-1.5 text-xs font-semibold border-b border-gray-700 shrink-0">
           Current →
         </div>
-        <div className="min-w-max">
-          {rightLines.map((line, i) => (
-            <div key={i} className={`flex ${bgColor(line.type)}`}>
-              <span className={`select-none w-10 shrink-0 text-right pr-3 py-0.5 border-r border-gray-700 ${lineNumColor(line.type)}`}>
-                {line.text !== '' ? line.lineNo : ''}
-              </span>
-              <span className="px-3 py-0.5 whitespace-pre">{line.text}</span>
-            </div>
-          ))}
+        {/* Scroll: Y shared (via sync), X independent */}
+        <div
+          ref={rightRef}
+          onScroll={handleRightScroll}
+          className="overflow-auto flex-1"
+        >
+          <div className="min-w-max">
+            {rightLines.map((line, i) => (
+              <div key={i} className={`flex ${bgColor(line.type)}`}>
+                <span className={`select-none w-10 shrink-0 text-right pr-3 py-0.5 border-r border-gray-700 ${lineNumColor(line.type)}`}>
+                  {line.text !== '' ? line.lineNo : ''}
+                </span>
+                <span className="px-3 py-0.5 whitespace-pre">{line.text}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -916,7 +955,7 @@ export function BackupsPage() {
 
       {/* ── Diff Modal ── */}
       <Dialog open={isDiffOpen} onOpenChange={setIsDiffOpen}>
-        <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
+        <DialogContent className="flex flex-col" style={{ maxWidth: '95vw', width: '95vw', maxHeight: '95vh', height: '95vh' }}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <GitCompare className="w-4 h-4 text-orange-500" />
