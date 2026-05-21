@@ -182,7 +182,6 @@ export function BackupsPage() {
   const [batchActionLoading, setBatchActionLoading] = useState<string | null>(null);
   const [batchAcknowledgeLoading, setBatchAcknowledgeLoading] = useState(false);
   const [batchAcceptLatestLoading, setBatchAcceptLatestLoading] = useState(false);
-  const [recalculateLoading, setRecalculateLoading] = useState(false);
 
   // Role check
   const u = typeof window !== 'undefined' ? localStorage.getItem('abs_user') : null;
@@ -476,29 +475,6 @@ export function BackupsPage() {
       setBatchAcceptLatestLoading(false);
     }
   };
-
-  const handleRecalculateHashes = async () => {
-    if (!confirm(
-      'Recalculate all backup hashes from disk?\n\nThis will fix false-positive "Changed" statuses caused by \\r\\n vs \\n line-ending inconsistencies. Run this once after updating the system.'
-    )) return;
-    setRecalculateLoading(true);
-    try {
-      const res = await apiPost<{}, { message: string; updated: number; skipped: number; errors: string[] }>(
-        '/backups/recalculate-hashes',
-        {}
-      );
-      toast.success(`${res.message} Updated: ${res.updated}, Skipped: ${res.skipped}${
-        res.errors.length ? `, Errors: ${res.errors.length}` : ''
-      }`);
-      await Promise.all([fetchBackups(), fetchActiveBackups()]);
-    } catch (err: unknown) {
-      const msg = (err && typeof err === 'object' && 'message' in err) ? (err as { message?: string }).message : String(err);
-      toast.error('Failed to recalculate hashes: ' + (msg || 'Unknown error'));
-    } finally {
-      setRecalculateLoading(false);
-    }
-  };
-
 
   // Group filteredBackups into BatchGroups
   const groupedBatches = useMemo(() => {
