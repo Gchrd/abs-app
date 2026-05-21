@@ -6,6 +6,7 @@ from ..utils.crypto import dec
 from ..utils.timeutil import tznow
 from ..services.netmiko_worker import fetch_running_config
 from ..services.job_controller import submit
+from ..utils.config_sanitizer import sanitize_config
 from hashlib import sha256
 from pathlib import Path
 from ..security import get_current_user, require_admin
@@ -57,11 +58,17 @@ async def run_manual(db: Session = Depends(get_db), current_user=Depends(require
                             port=device_info['port']
                         )
                         
+                        # Sanitize content for hashing (ignore timestamps)
+                        # fetch_running_config returns bytes, so decode first
+                        content_str = content.decode('utf-8', errors='ignore')
+                        clean_content_str = sanitize_config(content_str, vendor=device_info['vendor'])
+                        clean_hash = sha256(clean_content_str.encode('utf-8')).hexdigest()[:8]
+
                         # Save backup record
                         b = Backup(
                             device_id=device_info['id'], 
                             size_bytes=len(content),
-                            hash=sha256(content).hexdigest()[:8], 
+                            hash=clean_hash, 
                             path=str(path)
                         )
                         db.add(b)
