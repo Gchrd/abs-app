@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Eye, Download, Search, GitCompare, Star, Loader2, ChevronDown, ChevronRight, Trash2, FolderDown } from 'lucide-react';
 import { toast } from 'sonner';
-import { apiGet, apiGetBlob, apiGetText, apiPut, downloadBackupDate, deleteBackupDate, downloadActiveBackups } from '@/lib/api';
+import { apiGet, apiGetBlob, apiGetText, apiPut, apiPost, downloadBackupDate, deleteBackupDate, downloadActiveBackups } from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -172,6 +172,8 @@ export function BackupsPage() {
   const [deletingDate, setDeletingDate] = useState<string | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [batchActionLoading, setBatchActionLoading] = useState<string | null>(null);
+  const [batchAcknowledgeLoading, setBatchAcknowledgeLoading] = useState(false);
+  const [batchAcceptLatestLoading, setBatchAcceptLatestLoading] = useState(false);
 
   // Role check
   const u = typeof window !== 'undefined' ? localStorage.getItem('abs_user') : null;
@@ -290,6 +292,9 @@ export function BackupsPage() {
   // Sets the LATEST backup (right panel) as active
   const handleAcceptLatest = async () => {
     if (!diffActiveBackup?.previous_backup_id) return;
+    if (!confirm(`Are you sure you want to use the latest configuration as the active reference for ${diffActiveBackup.device_name}?`)) {
+      return;
+    }
     setRevertingId(diffActiveBackup.previous_backup_id);
     try {
       await apiPut(`/backups/${diffActiveBackup.previous_backup_id}/set-active`, {});
@@ -308,6 +313,9 @@ export function BackupsPage() {
   // Sets the CURRENT REFERENCE backup (left panel) as active explicitly, AND acknowledges the latest (right panel)
   const handleKeepPrevious = async () => {
     if (!diffActiveBackup?.backup_id) return;
+    if (!confirm(`Are you sure you want to keep the previous configuration for ${diffActiveBackup.device_name}? This will acknowledge the changes.`)) {
+      return;
+    }
     setRevertingId(diffActiveBackup.backup_id);
     try {
       // 1. Re-affirm the old backup as active
@@ -412,6 +420,54 @@ export function BackupsPage() {
     }
   };
 
+  const handleKeepPreviousAll = async () => {
+    const changedCount = activeBackups.filter(ab => ab.status_changed).length;
+    if (changedCount === 0) {
+      toast.info('No devices have changed configuration.');
+      return;
+    }
+    
+    if (!confirm(`Are you sure you want to keep the previous configuration for all ${changedCount} changed devices? This will acknowledge the changes.`)) {
+      return;
+    }
+
+    setBatchAcknowledgeLoading(true);
+    try {
+      const res = await apiPost<{}, { message: string, count: number }>('/backups/acknowledge-all', {});
+      toast.success(res.message || `Successfully acknowledged ${res.count} devices.`);
+      await Promise.all([fetchBackups(), fetchActiveBackups()]);
+    } catch (err: unknown) {
+      const msg = (err && typeof err === 'object' && 'message' in err) ? (err as { message?: string }).message : String(err);
+      toast.error('Failed to keep previous configurations: ' + (msg || 'Unknown error'));
+    } finally {
+      setBatchAcknowledgeLoading(false);
+    }
+  };
+
+  const handleAcceptLatestAll = async () => {
+    const changedCount = activeBackups.filter(ab => ab.status_changed).length;
+    if (changedCount === 0) {
+      toast.info('No devices have changed configuration.');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to use the latest configuration as the reference for all ${changedCount} changed devices?`)) {
+      return;
+    }
+
+    setBatchAcceptLatestLoading(true);
+    try {
+      const res = await apiPost<{}, { message: string, count: number }>('/backups/accept-latest-all', {});
+      toast.success(res.message || `Successfully updated ${res.count} devices.`);
+      await Promise.all([fetchBackups(), fetchActiveBackups()]);
+    } catch (err: unknown) {
+      const msg = (err && typeof err === 'object' && 'message' in err) ? (err as { message?: string }).message : String(err);
+      toast.error('Failed to use latest configurations: ' + (msg || 'Unknown error'));
+    } finally {
+      setBatchAcceptLatestLoading(false);
+    }
+  };
+
   // Group filteredBackups by Date (YYYY-MM-DD from local timezone)
   const groupedBackups = filteredBackups.reduce((groups: Record<string, Backup[]>, backup) => {
     const d = new Date(backup.timestamp);
@@ -446,20 +502,54 @@ export function BackupsPage() {
             <h3 className="text-base font-semibold text-gray-800">Active Backup</h3>
             <span className="text-xs text-gray-500">(1 per device — config's references)</span>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            disabled={activeBatchLoading || activeBackups.length === 0}
-            onClick={handleDownloadActiveBatch}
-          >
-            {activeBatchLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <FolderDown className="w-4 h-4 text-blue-600" />
+          <div className="flex items-center gap-2">
+            {isAdmin && activeBackups.some(ab => ab.status_changed) && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 text-orange-600 border-orange-300 hover:bg-orange-50 font-medium"
+                  disabled={batchAcknowledgeLoading || batchAcceptLatestLoading}
+                  onClick={handleKeepPreviousAll}
+                >
+                  {batchAcknowledgeLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <GitCompare className="w-4 h-4 text-orange-500" />
+                  )}
+                  <span>Use Previous (All)</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 text-blue-600 border-blue-300 hover:bg-blue-50 font-medium"
+                  disabled={batchAcknowledgeLoading || batchAcceptLatestLoading}
+                  onClick={handleAcceptLatestAll}
+                >
+                  {batchAcceptLatestLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Star className="w-4 h-4 text-blue-500 fill-blue-500" />
+                  )}
+                  <span>Use Latest (All)</span>
+                </Button>
+              </>
             )}
-            <span className="hidden sm:inline">Download Active Batch</span>
-          </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              disabled={activeBatchLoading || activeBackups.length === 0}
+              onClick={handleDownloadActiveBatch}
+            >
+              {activeBatchLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FolderDown className="w-4 h-4 text-blue-600" />
+              )}
+              <span className="hidden sm:inline">Download Active Batch</span>
+            </Button>
+          </div>
         </div>
 
         <div className="border rounded-lg bg-white">

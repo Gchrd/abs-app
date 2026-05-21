@@ -341,3 +341,81 @@ def delete_backup_date(date_str: str, db: Session = Depends(get_db), current_use
     
     audit_event(user=current_user.username, action="backup_delete_batch", target=f"date: {date_str}", result=f"success (deleted {deleted_count} backups)")
     return {"message": f"Successfully deleted {deleted_count} backups for date {date_str}"}
+
+
+@router.post("/acknowledge-all")
+def acknowledge_all_backups(current_user=Depends(require_admin), db: Session = Depends(get_db)):
+    """Acknowledge all changed backups (keep previous config as active reference, and clear 'Changed' status)."""
+    devices = db.query(Device).filter(Device.enabled == True).all()
+    count = 0
+    for dev in devices:
+        latest = (
+            db.query(Backup)
+            .filter(Backup.device_id == dev.id, Backup.status == "success")
+            .order_by(Backup.timestamp.desc())
+            .first()
+        )
+        if not latest:
+            continue
+
+        if dev.active_backup_id is None:
+            active = latest
+        else:
+            active = db.get(Backup, dev.active_backup_id)
+            if not active:
+                active = latest
+
+        # Check if it has a difference and is not acknowledged yet
+        if active.id != latest.id and (not dev.last_ack_backup_id or dev.last_ack_backup_id != latest.id):
+            if active.hash != latest.hash:
+                dev.last_ack_backup_id = latest.id
+                count += 1
+
+    db.commit()
+    
+    audit_event(
+        user=current_user.username,
+        action="backup_acknowledge_all",
+        target="all_devices",
+        result=f"success (acknowledged {count} devices)"
+    )
+    return {"message": f"Successfully acknowledged {count} devices.", "count": count}
+
+
+@router.post("/accept-latest-all")
+def accept_latest_all_backups(current_user=Depends(require_admin), db: Session = Depends(get_db)):
+    """Set the latest backup as the active reference for all changed devices."""
+    devices = db.query(Device).filter(Device.enabled == True).all()
+    count = 0
+    for dev in devices:
+        latest = (
+            db.query(Backup)
+            .filter(Backup.device_id == dev.id, Backup.status == "success")
+            .order_by(Backup.timestamp.desc())
+            .first()
+        )
+        if not latest:
+            continue
+
+        if dev.active_backup_id is None:
+            active = latest
+        else:
+            active = db.get(Backup, dev.active_backup_id)
+            if not active:
+                active = latest
+
+        # Check if it has a difference
+        if active.id != latest.id:
+            if active.hash != latest.hash:
+                dev.active_backup_id = latest.id
+                count += 1
+
+    db.commit()
+    
+    audit_event(
+        user=current_user.username,
+        action="backup_accept_latest_all",
+        target="all_devices",
+        result=f"success (updated {count} devices)"
+    )
+    return {"message": f"Successfully updated {count} devices to latest backup.", "count": count}
