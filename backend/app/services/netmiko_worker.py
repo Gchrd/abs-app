@@ -295,8 +295,10 @@ def fetch_running_config(
             pass
 
     # Validasi isi output sebelum dianggap sukses
-    if len(output.strip()) < 50:
-        raise Exception("Backup failure: Output is empty or suspiciously short (less than 50 chars). The device might be busy, slow to respond, or the prompt was not detected correctly.")
+    # Limit diubah menjadi 10 karakter karena beberapa device (seperti MikroTik SwitchOS atau switch basic) 
+    # bisa memiliki konfigurasi yang sangat pendek (sekitar 20-40 karakter).
+    if len(output.strip()) < 10:
+        raise Exception("Backup failure: Output is empty or suspiciously short (less than 10 chars). The device might be busy, slow to respond, or the prompt was not detected correctly.")
 
     # Simpan ke file
     content = output.encode()
