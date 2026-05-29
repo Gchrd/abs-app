@@ -294,6 +294,10 @@ def fetch_running_config(
         except Exception:
             pass
 
+    # Validasi isi output sebelum dianggap sukses
+    if len(output.strip()) < 50:
+        raise Exception("Backup failure: Output is empty or suspiciously short (less than 50 chars). The device might be busy, slow to respond, or the prompt was not detected correctly.")
+
     # Simpan ke file
     content = output.encode()
     filehash = sha256(content).hexdigest()[:8]
