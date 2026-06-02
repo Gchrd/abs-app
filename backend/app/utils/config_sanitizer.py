@@ -82,6 +82,14 @@ def sanitize_huawei(content: str) -> str:
     return sanitize_regex(content, ts_pattern)
 
 
+def sanitize_fortinet(content: str) -> str:
+    patterns = [
+        # Fortinet config version line which changes every export
+        r"^#conf_file_ver=",
+    ]
+    return sanitize_regex(content, patterns)
+
+
 def sanitize_config(content: str, vendor: str = 'cisco_ios') -> str:
     """
     Generic sanitizer wrapper. Dispatches to specific vendor logic.
@@ -101,6 +109,8 @@ def sanitize_config(content: str, vendor: str = 'cisco_ios') -> str:
         return sanitize_aruba(content)
     elif 'huawei' in vendor_lower:
         return sanitize_huawei(content)
+    elif 'fortinet' in vendor_lower:
+        return sanitize_fortinet(content)
     
     # Default: return normalized content as-is
     return content
