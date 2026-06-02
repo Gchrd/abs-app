@@ -73,7 +73,27 @@ def list_active_backups(current_user=Depends(get_current_user), db: Session = De
             status_changed = False
             newer_backup_id = None
         else:
-            status_changed = (latest.hash != active.hash)
+            if latest.hash == active.hash:
+                status_changed = False
+            else:
+                # Fallback: Check if the actual sanitized contents are identical
+                # This handles cases where old hashes in DB don't match new sanitizer logic
+                try:
+                    from ..utils.config_sanitizer import sanitize_config
+                    p_active = Path(active.path)
+                    p_latest = Path(latest.path)
+                    if p_active.exists() and p_latest.exists():
+                        raw_active = p_active.read_text(encoding="utf-8", errors="replace")
+                        raw_latest = p_latest.read_text(encoding="utf-8", errors="replace")
+                        vendor = dev.vendor if dev else "cisco_ios"
+                        clean_active = sanitize_config(raw_active, vendor=vendor)
+                        clean_latest = sanitize_config(raw_latest, vendor=vendor)
+                        status_changed = (clean_active != clean_latest)
+                    else:
+                        status_changed = True
+                except Exception:
+                    status_changed = True
+
             newer_backup_id = latest.id if status_changed else None
 
         out.append({
