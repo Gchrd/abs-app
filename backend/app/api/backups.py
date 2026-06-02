@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, Response
 from ..database import SessionLocal
 import io
 import zipfile
@@ -245,6 +245,70 @@ def get_diff(current: int, previous: int, current_user=Depends(get_current_user)
         "current_backup_id": b_current.id,
         "previous_backup_id": b_previous.id,
     }
+
+@router.get("/diagnose/{device_id}")
+def diagnose_device(device_id: int, db: Session = Depends(get_db)):
+    """Deep diagnostic endpoint to find out exactly why a device is marked as changed."""
+    from ..utils.config_sanitizer import sanitize_config
+    import difflib
+    import traceback
+
+    dev = db.get(Device, device_id)
+    if not dev: return Response(content="Device not found", media_type="text/plain")
+
+    backups = db.query(Backup).filter(Backup.device_id == device_id, Backup.status == "success").order_by(Backup.timestamp.desc()).limit(2).all()
+    if len(backups) < 2: return Response(content="Need at least 2 backups to diagnose", media_type="text/plain")
+
+    latest = backups[0]
+    active = backups[1]
+    
+    report = [f"=== DIAGNOSIS FOR DEVICE {dev.hostname} (ID {device_id}) ==="]
+    report.append(f"Latest Backup ID: {latest.id} | Hash in DB: {latest.hash}")
+    report.append(f"Active Backup ID: {active.id} | Hash in DB: {active.hash}")
+    report.append(f"Hash Match: {latest.hash == active.hash}")
+    
+    try:
+        p_active = Path(active.path)
+        p_latest = Path(latest.path)
+        
+        report.append(f"\nFile Active Exists: {p_active.exists()} | Path: {active.path}")
+        report.append(f"File Latest Exists: {p_latest.exists()} | Path: {latest.path}")
+        
+        if p_active.exists() and p_latest.exists():
+            raw_active = p_active.read_text(encoding="utf-8", errors="replace")
+            raw_latest = p_latest.read_text(encoding="utf-8", errors="replace")
+            vendor = dev.vendor if dev else "cisco_ios"
+            
+            clean_active = sanitize_config(raw_active, vendor=vendor)
+            clean_latest = sanitize_config(raw_latest, vendor=vendor)
+            
+            report.append(f"\nSanitized Active Length (chars): {len(clean_active)}")
+            report.append(f"Sanitized Latest Length (chars): {len(clean_latest)}")
+            report.append(f"Exact String Match: {clean_active == clean_latest}")
+            
+            if clean_active != clean_latest:
+                report.append("\n--- EXACT DIFFERENCES FOUND ---")
+                active_lines = clean_active.splitlines()
+                latest_lines = clean_latest.splitlines()
+                diff = list(difflib.ndiff(active_lines, latest_lines))
+                changes = [line for line in diff if line.startswith('+ ') or line.startswith('- ')]
+                if changes:
+                    report.append(f"Found {len(changes)} changed lines:")
+                    for c in changes[:50]: # limit to 50 lines to prevent overload
+                        report.append(c)
+                    if len(changes) > 50:
+                        report.append(f"... and {len(changes) - 50} more lines.")
+                else:
+                    report.append("difflib found NO line differences! The difference must be invisible characters or line endings.")
+                    report.append(f"Active repr: {repr(clean_active[-50:])}")
+                    report.append(f"Latest repr: {repr(clean_latest[-50:])}")
+            else:
+                report.append("\nNO DIFFERENCES FOUND in sanitized text. The fallback logic should have caught this!")
+    except Exception as e:
+        report.append("\nEXCEPTION DURING FALLBACK:")
+        report.append(traceback.format_exc())
+        
+    return Response(content="\n".join(report), media_type="text/plain")
 
 @router.get("/{backup_id}/download")
 def download_backup(backup_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
