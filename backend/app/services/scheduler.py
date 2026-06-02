@@ -99,7 +99,7 @@ async def run_scheduled_backup(schedule_id: int, schedule_name: str):
                     if attempt == 0:
                         log_lines.append(f"[{device_info['hostname']}] Connecting to {device_info['ip']}...")
                     else:
-                        log_lines.append(f"[{device_info['hostname']}] Mencoba backup ulang...")
+                        log_lines.append(f"[{device_info['hostname']}] Retrying backup...")
                         
                     path, content = fetch_running_config(
                         vendor=device_info['vendor'], 
@@ -133,7 +133,7 @@ async def run_scheduled_backup(schedule_id: int, schedule_name: str):
                 except Exception as e:
                     if attempt < max_attempts - 1:
                         # Log the failure and wait before retrying
-                        log_lines.append(f"[{device_info['hostname']}] Backup gagal... ({str(e)})")
+                        log_lines.append(f"[{device_info['hostname']}] Backup failed... ({str(e)})")
                         delay = retry_delays[attempt]
                         await asyncio.sleep(delay)
                     else:

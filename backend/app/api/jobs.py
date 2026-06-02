@@ -46,7 +46,7 @@ async def run_manual(db: Session = Depends(get_db), current_user=Depends(require
                         if attempt == 0:
                             log_lines.append(f"[{device_info['hostname']}] Connecting to {device_info['ip']}...")
                         else:
-                            log_lines.append(f"[{device_info['hostname']}] Mencoba backup ulang...")
+                            log_lines.append(f"[{device_info['hostname']}] Retrying backup...")
 
                         # Fetch running config
                         path, content = fetch_running_config(
@@ -81,7 +81,7 @@ async def run_manual(db: Session = Depends(get_db), current_user=Depends(require
 
                     except Exception as e:
                         if attempt < max_attempts - 1:
-                            log_lines.append(f"[{device_info['hostname']}] Backup gagal... ({str(e)})")
+                            log_lines.append(f"[{device_info['hostname']}] Backup failed... ({str(e)})")
                             delay = retry_delays[attempt]
                             await asyncio.sleep(delay)
                         else:
