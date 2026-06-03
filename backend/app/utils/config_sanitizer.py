@@ -66,6 +66,8 @@ def sanitize_aruba(content: str) -> str:
         r"^; Generated on ",
         r"^; Current System Time:",
         r"^Current system time:",
+        # Aruba dynamically hashes passwords/keys in exports
+        r"^\s*(?:admin-passwd|key|ap-console-password|bkup-passwords|wpa-passphrase) ",
     ]
     return sanitize_regex(content, patterns)
 
