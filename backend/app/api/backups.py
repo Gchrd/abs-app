@@ -249,6 +249,16 @@ def get_diff(current: int, previous: int, current_user=Depends(get_current_user)
 @router.get("/diagnose/{device_id}")
 def diagnose_device(device_id: int, db: Session = Depends(get_db)):
     """Deep diagnostic endpoint to find out exactly why a device is marked as changed."""
+    return run_diagnose(device_id, db)
+
+@router.get("/diagnose/by-name/{hostname}")
+def diagnose_device_by_name(hostname: str, db: Session = Depends(get_db)):
+    dev = db.query(Device).filter(Device.hostname == hostname).first()
+    if not dev: return Response(content=f"Device {hostname} not found", media_type="text/plain")
+    return run_diagnose(dev.id, db)
+
+def run_diagnose(device_id: int, db: Session):
+    """Deep diagnostic endpoint to find out exactly why a device is marked as changed."""
     from ..utils.config_sanitizer import sanitize_config
     import difflib
     import traceback
