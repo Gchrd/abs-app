@@ -86,6 +86,10 @@ def sanitize_fortinet(content: str) -> str:
     patterns = [
         # Fortinet config version line which changes every export
         r"^#conf_file_ver=",
+        # Fortinet encrypts passwords with dynamic salts that change every export
+        r"^\s*set (?:password|secret|psksecret|private-key|auth-password) ENC ",
+        # Catch any other generic ENC fields just in case
+        r"^\s*set .* ENC "
     ]
     return sanitize_regex(content, patterns)
 
