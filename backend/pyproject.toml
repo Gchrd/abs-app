@@ -9,6 +9,9 @@ addopts = [
     "--tb=short",
     "--disable-warnings"
 ]
+filterwarnings = [
+    "ignore"
+]
 markers = [
     "auth: Authentication tests",
     "protected: Protected route tests"
