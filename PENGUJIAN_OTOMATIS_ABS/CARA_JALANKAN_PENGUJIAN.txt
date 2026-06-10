@@ -1,0 +1,25 @@
+Daftar Berkas Pengujian Otomatis ABS (Automated Backup System):
+
+1. test_richard_features.py
+   -> Berkas utama berisi skenario pengujian unit & integrasi untuk fitur kontribusi Anda (Config Sanitizer, Active Backup & Acknowledge flow, Batch ZIP Download, dan Batch Delete dengan safety lock).
+
+2. conftest.py
+   -> Berkas konfigurasi pytest untuk menginisialisasi basis data SQLite sementara di memori (RAM), mengimpor model, dan menyediakan akun penguji (Admin/Viewer).
+
+--------------------------------------------------------------------------------
+PETUNJUK CARA MENJALANKAN PENGUJIAN OTOMATIS:
+--------------------------------------------------------------------------------
+
+Langkah-langkah untuk mengeksekusi tes di komputer Anda:
+
+1. Buka Terminal / Command Prompt / PowerShell.
+2. Pindah ke direktori backend proyek ABS:
+   cd "d:\Mayora\Laporan Magang\LateX laporan magang\abs-source-full\backend"
+
+3. Pastikan dependensi pengujian (pytest dan library backend) sudah terinstal:
+   pip install pytest fastapi sqlalchemy pyjwt
+
+4. Jalankan perintah pytest dengan verbose mode (-v) untuk melihat seluruh 47 kasus uji:
+   pytest tests/ -v
+
+5. Hasil eksekusi akan muncul di layar. Anda akan melihat 47 indikator hijau "PASSED" yang menandakan seluruh sistem backend dan fitur Anda lulus pengujian dengan sukses 100%.
