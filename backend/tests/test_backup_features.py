@@ -130,6 +130,7 @@ def test_batch_operations_and_safety_locks(client, admin_headers, db_session, tm
     file2 = tmp_path / "config2.txt"
     file2.write_text("interface Gi0/1\n no shutdown")
 
+    from datetime import datetime
     # Create two backups belonging to batch '2026-05-25'
     b1 = Backup(
         device_id=dev.id,
@@ -137,7 +138,8 @@ def test_batch_operations_and_safety_locks(client, admin_headers, db_session, tm
         hash="hash_b1",
         status="success",
         path=str(file1),
-        batch_id="2026-05-25"
+        batch_id="2026-05-25",
+        timestamp=datetime(2026, 5, 25, 12, 0, 0)
     )
     b2 = Backup(
         device_id=dev.id,
@@ -145,7 +147,8 @@ def test_batch_operations_and_safety_locks(client, admin_headers, db_session, tm
         hash="hash_b2",
         status="success",
         path=str(file2),
-        batch_id="2026-05-25"
+        batch_id="2026-05-25",
+        timestamp=datetime(2026, 5, 25, 12, 0, 0)
     )
     db.add(b1)
     db.add(b2)
