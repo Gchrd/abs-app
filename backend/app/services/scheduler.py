@@ -149,19 +149,20 @@ async def run_scheduled_backup(schedule_id: int, schedule_name: str):
         log_lines.append(f"Job completed: {ok}/{len(device_list)} successful")
         
         job = db.query(Job).filter_by(id=job_id).first()
+        job_status = "success" if ok > 0 else "failed"
         if job:
-            job.status = "success"
+            job.status = job_status
             job.devices = ok
             job.finished_at = tznow()
             job.log = "\n".join(log_lines)
             db.commit()
-        
+
         # Audit log
         audit_event(
             user="system",
             action="job_run_scheduled",
             target=f"schedule:{schedule_name}",
-            result=f"success ({ok}/{len(device_list)} devices)"
+            result=f"{job_status} ({ok}/{len(device_list)} devices)"
         )
         
     except Exception as e:

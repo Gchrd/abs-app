@@ -96,13 +96,13 @@ async def run_manual(db: Session = Depends(get_db), current_user=Depends(require
             from datetime import datetime
             log_lines.append(f"Job completed: {ok}/{len(device_list)} successful")
             
-            job.status = "success"
+            job.status = "success" if ok > 0 else "failed"
             job.devices = ok
             job.finished_at = tznow()
             job.log = "\n".join(log_lines)
             db.commit()
-            
-            audit_event(user=current_user.username, action="job_run_manual", target=f"job#{job_id}", result=f"success ({ok}/{len(device_list)} devices)")
+
+            audit_event(user=current_user.username, action="job_run_manual", target=f"job#{job_id}", result=f"{job.status} ({ok}/{len(device_list)} devices)")
             
         finally:
             db.close()

@@ -313,7 +313,6 @@ export function DevicesPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Hostname</TableHead>
-                <TableHead>IP</TableHead>
                 <TableHead>Vendor</TableHead>
                 <TableHead>Protocol</TableHead>
                 <TableHead>Port</TableHead>
@@ -326,7 +325,7 @@ export function DevicesPage() {
             <TableBody>
               {filteredDevices.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     {searchQuery ? 'No devices match your search.' : 'No devices found. Add a device to get started.'}
                   </TableCell>
                 </TableRow>
@@ -335,8 +334,10 @@ export function DevicesPage() {
                   const isEnabled = device.enabled !== false;
                   return (
                     <TableRow key={device.id}>
-                      <TableCell className="font-medium">{device.hostname}</TableCell>
-                      <TableCell>{device.ip}</TableCell>
+                      <TableCell>
+                        <div className="font-medium">{device.hostname}</div>
+                        <div className="text-xs text-muted-foreground">{device.ip}</div>
+                      </TableCell>
                       <TableCell>{device.vendor}</TableCell>
                       <TableCell>{device.protocol}</TableCell>
                       <TableCell>{device.port}</TableCell>

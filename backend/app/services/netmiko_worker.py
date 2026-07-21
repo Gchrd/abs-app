@@ -30,6 +30,32 @@ def _device_type_ssh(vendor: str) -> str:
     return VENDOR_MAP.get(vendor, "cisco_ios")
 
 
+# Known CLI "invalid/unrecognized command" error signatures across vendors.
+# A device that doesn't understand the config-fetch command (wrong device_type,
+# wrong privilege level, unsupported syntax on that firmware, etc.) replies with
+# one of these instead of real config text - that reply must NOT be saved as a backup.
+_CLI_ERROR_SIGNATURES = [
+    "invalid input detected",       # Cisco IOS/ASA/NXOS, Allied Telesis, Aruba AOS
+    "unrecognized command",         # Cisco, Huawei, Aruba AOS-CX
+    "ambiguous command",            # Cisco
+    "incomplete command",           # Cisco
+    "unknown command",              # Juniper, Aruba, generic
+    "wrong parameter found",        # Huawei
+    "bad command name",             # MikroTik
+    "no such item",                 # MikroTik
+    "expected end of command",      # MikroTik
+    "syntax error",                 # Juniper, Fortinet
+    "command fail",                 # Fortinet
+    "entry not found",              # Fortinet
+]
+
+
+def _looks_like_cli_error(output: str) -> bool:
+    """Detect a device CLI error response so it isn't mistaken for real config content."""
+    lowered = output.lower()
+    return any(sig in lowered for sig in _CLI_ERROR_SIGNATURES)
+
+
 def _get_config_command(vendor: str) -> str:
     """Get the appropriate command to retrieve configuration based on vendor."""
     vendor_lower = vendor.lower()
@@ -299,6 +325,14 @@ def fetch_running_config(
     # bisa memiliki konfigurasi yang sangat pendek (sekitar 20-40 karakter).
     if len(output.strip()) < 10:
         raise Exception("Backup failure: Output is empty or suspiciously short (less than 10 chars). The device might be busy, slow to respond, or the prompt was not detected correctly.")
+
+    if _looks_like_cli_error(output):
+        raise Exception(
+            f"Backup failure: Device returned a command error instead of configuration "
+            f"(command '{cmd or _get_config_command(vendor)}' may be wrong for this device's "
+            f"vendor/firmware, or the session wasn't in the right privilege level). "
+            f"Raw reply: {output.strip()[:200]!r}"
+        )
 
     # Simpan ke file
     content = output.encode()
