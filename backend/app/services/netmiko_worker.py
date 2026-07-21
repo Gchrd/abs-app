@@ -187,8 +187,18 @@ def _connect_ssh_normal(
 
     conn = ConnectHandler(**device)
 
-    if secret:
-        conn.enable()
+    # Always try to reach privileged/enable mode, even if no enable secret was
+    # configured - some devices allow "enable" with a blank password. Previously
+    # this was skipped entirely whenever `secret` was empty, which left the
+    # session in user EXEC mode on devices that need it, causing commands like
+    # 'show running-config' to be rejected as "Invalid input detected" instead
+    # of a clear permission error. Wrapped safely: some platforms don't support
+    # enable mode at all, and sessions already privileged should no-op here.
+    try:
+        if not conn.check_enable_mode():
+            conn.enable()
+    except Exception:
+        pass
 
     return conn
 
