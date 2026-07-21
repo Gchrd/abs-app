@@ -192,11 +192,15 @@ def _connect_ssh_normal(
     # this was skipped entirely whenever `secret` was empty, which left the
     # session in user EXEC mode on devices that need it, causing commands like
     # 'show running-config' to be rejected as "Invalid input detected" instead
-    # of a clear permission error. Wrapped safely: some platforms don't support
-    # enable mode at all, and sessions already privileged should no-op here.
+    # of a clear permission error.
+    # check_state=False: don't trust check_enable_mode()'s prompt detection here -
+    # on some devices it can misreport already being privileged (skipping enable()
+    # entirely, including netmiko's own internal check inside enable() by default).
+    # Forcing the attempt is harmless on an already-privileged session and is the
+    # only way to reliably escalate on ones that aren't. Wrapped safely: some
+    # platforms don't support enable mode at all.
     try:
-        if not conn.check_enable_mode():
-            conn.enable()
+        conn.enable(check_state=False)
     except Exception:
         pass
 
@@ -227,6 +231,7 @@ def fetch_running_config(
     conn = None
     output = ""
     tn = None  # For telnetlib connection
+    session_log_tail = ""  # raw transcript for diagnostics, captured before cleanup deletes it
 
     try:
         # SAFE protocol detection (strip whitespace)
@@ -302,6 +307,16 @@ def fetch_running_config(
         raise Exception(f"Connection failed: {host} | Error: {error_msg}")
 
     finally:
+        # Capture a tail of the raw session transcript before it gets deleted below,
+        # so a CLI-error failure message can show exactly what the device sent back
+        # (including the enable attempt) instead of just the final command's reply.
+        try:
+            if os.path.exists(session_log):
+                with open(session_log, "rb") as f:
+                    session_log_tail = f.read().decode("utf-8", errors="ignore")[-800:]
+        except Exception:
+            pass
+
         # Cleanup connections
         if tn:
             try:
@@ -337,11 +352,12 @@ def fetch_running_config(
         raise Exception("Backup failure: Output is empty or suspiciously short (less than 10 chars). The device might be busy, slow to respond, or the prompt was not detected correctly.")
 
     if _looks_like_cli_error(output):
+        transcript_note = f" | Session transcript tail: {session_log_tail!r}" if session_log_tail else ""
         raise Exception(
             f"Backup failure: Device returned a command error instead of configuration "
             f"(command '{cmd or _get_config_command(vendor)}' may be wrong for this device's "
             f"vendor/firmware, or the session wasn't in the right privilege level). "
-            f"Raw reply: {output.strip()[:200]!r}"
+            f"Raw reply: {output.strip()[:200]!r}{transcript_note}"
         )
 
     # Simpan ke file

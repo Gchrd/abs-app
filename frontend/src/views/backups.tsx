@@ -51,6 +51,12 @@ interface DiffResult {
   previous_backup_id: number;
 }
 
+interface JobSummary {
+  id: number;
+  status: string;
+  started_at: string;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatSize(bytes: number) {
@@ -193,6 +199,10 @@ export function BackupsPage() {
   const [loading, setLoading] = useState(false);
   const [activeLoading, setActiveLoading] = useState(false);
   const [activeBatchLoading, setActiveBatchLoading] = useState(false);
+  // Device IDs that got a successful backup in the most recent (non-running) job run.
+  // Any device shown in the Active Backup table that's NOT in this set failed its
+  // latest run - shown as a distinct "Backup Failed" status, not lumped in with "Unchanged".
+  const [succeededDeviceIdsInLatestRun, setSucceededDeviceIdsInLatestRun] = useState<Set<number>>(new Set());
 
   // Filters
   const [deviceFilter, setDeviceFilter] = useState('All');
@@ -268,10 +278,34 @@ export function BackupsPage() {
     }
   }, []);
 
+  const fetchLatestRunStatus = useCallback(async () => {
+    try {
+      const jobs = await apiGet<JobSummary[]>('/jobs');
+      // jobs are most-recent-first; skip an in-progress run so devices not
+      // reached yet aren't briefly flagged as "failed" mid-run
+      const latestJob = jobs.find(j => j.status !== 'running');
+      if (!latestJob) {
+        setSucceededDeviceIdsInLatestRun(new Set());
+        return;
+      }
+      const latestRunStart = new Date(latestJob.started_at);
+      const allBackups = await apiGet<{ device_id: number; timestamp: string; status: string }[]>('/backups');
+      const succeededDeviceIds = new Set(
+        allBackups
+          .filter(b => b.status === 'success' && new Date(b.timestamp) >= latestRunStart)
+          .map(b => b.device_id)
+      );
+      setSucceededDeviceIdsInLatestRun(succeededDeviceIds);
+    } catch {
+      // silent - this only augments the Config Status badge, not critical path
+    }
+  }, []);
+
   useEffect(() => {
     fetchBackups();
     fetchActiveBackups();
-  }, [fetchBackups, fetchActiveBackups]);
+    fetchLatestRunStatus();
+  }, [fetchBackups, fetchActiveBackups, fetchLatestRunStatus]);
 
   // ── Filters ────────────────────────────────────────────────────────────────
 
@@ -667,7 +701,11 @@ export function BackupsPage() {
                       <code className="text-xs bg-muted px-2 py-1 rounded">{ab.hash.slice(0, 8)}</code>
                     </TableCell>
                     <TableCell>
-                      {ab.status_changed ? (
+                      {!succeededDeviceIdsInLatestRun.has(ab.device_id) ? (
+                        <Badge className="bg-red-100 text-red-700 border border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800" title="This device's most recent backup run did not succeed - config status below may be stale.">
+                          ⚠️ Backup Failed
+                        </Badge>
+                      ) : ab.status_changed ? (
                         <Badge className="bg-orange-100 text-orange-700 border border-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-800">
                           🔄 Changed
                         </Badge>
