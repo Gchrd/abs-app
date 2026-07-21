@@ -16,14 +16,14 @@ export function EyeToggleButton({ visible, onClick, className, label }: EyeToggl
       type="button"
       onClick={onClick}
       aria-label={label ?? (visible ? "Hide password" : "Show password")}
-      className={cn("shrink-0 opacity-60 hover:opacity-100 transition-opacity", className)}
+      className={cn("shrink-0 rounded p-1 -m-1 hover:bg-muted transition-colors", className)}
     >
       <Image
         src={visible ? "/icons/eye-open.png" : "/icons/eye-closed.png"}
         alt=""
         width={18}
         height={18}
-        className="dark:invert"
+        className="opacity-80 dark:opacity-90 dark:invert"
       />
     </button>
   );
