@@ -25,6 +25,12 @@ interface Device {
   enabled: boolean;
 }
 
+interface Backup {
+  device_id: number;
+  timestamp: string;
+  status: string;
+}
+
 interface ActiveBackup {
   device_id: number;
   status_changed: boolean;
@@ -56,26 +62,32 @@ export function DashboardPage() {
         // Fetch devices
         const devices = await apiGet<Device[]>('/devices');
         const totalDevices = devices.length;
+        const enabledDevices = devices.filter(d => d.enabled !== false);
 
         // Fetch devices with changed (unacknowledged) config
         const activeBackups = await apiGet<ActiveBackup[]>('/backups/active');
         const changedBackups = activeBackups.filter(ab => ab.status_changed).length;
 
-        // Fetch recent jobs
+        // Fetch recent jobs (for the Recent Jobs table only)
         const jobs = await apiGet<Job[]>('/jobs');
         setRecentJobs(jobs.slice(0, 5)); // Top 5 recent jobs
 
-        // Calculate backup stats from recent jobs (last 7 days)
+        // Successful/Failed is counted per switch, not per job: a switch counts as
+        // "successful" if it has at least one successful backup in the last 7 days;
+        // every other enabled switch counts as "failed" (never backed up successfully
+        // in that window) - so Successful + Failed always equals total enabled switches.
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-        const recentJobsLast7Days = jobs.filter(job => {
-          const jobDate = new Date(job.started_at);
-          return jobDate >= sevenDaysAgo;
-        });
+        const backups = await apiGet<Backup[]>('/backups');
+        const successfulDeviceIds = new Set(
+          backups
+            .filter(b => b.status === 'success' && new Date(b.timestamp) >= sevenDaysAgo)
+            .map(b => b.device_id)
+        );
 
-        const successfulBackups = recentJobsLast7Days.filter(j => j.status === 'success').length;
-        const failedBackups = recentJobsLast7Days.filter(j => j.status === 'failed').length;
+        const successfulBackups = enabledDevices.filter(d => successfulDeviceIds.has(d.id)).length;
+        const failedBackups = enabledDevices.length - successfulBackups;
 
         setStats({
           totalDevices,
@@ -93,8 +105,8 @@ export function DashboardPage() {
 
   const kpiItems = [
     { label: 'Total Devices', value: stats.totalDevices.toString(), icon: HardDrive, colorClass: 'text-blue-600 dark:text-blue-400' },
-    { label: 'Successful Backups (7 days)', value: stats.successfulBackups.toString(), icon: CheckCircle, colorClass: 'text-green-600 dark:text-green-400' },
-    { label: 'Failed Backups (7 days)', value: stats.failedBackups.toString(), icon: XCircle, colorClass: 'text-red-600 dark:text-red-400' },
+    { label: 'Switches Backed Up (7 days)', value: stats.successfulBackups.toString(), icon: CheckCircle, colorClass: 'text-green-600 dark:text-green-400' },
+    { label: 'Switches Not Backed Up (7 days)', value: stats.failedBackups.toString(), icon: XCircle, colorClass: 'text-red-600 dark:text-red-400' },
     { label: 'Backup Changes', value: stats.changedBackups.toString(), icon: RefreshCw, colorClass: 'text-orange-600 dark:text-orange-400' },
   ];
 
