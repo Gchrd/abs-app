@@ -39,30 +39,30 @@ export function BackupChangesWidget() {
       <CardContent className="p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <RefreshCw className="w-4 h-4 text-orange-500" />
-            <h3 className="text-gray-900 font-semibold">Backup Changes</h3>
+            <RefreshCw className="w-4 h-4 text-orange-500 dark:text-orange-400" />
+            <h3 className="text-foreground font-semibold">Backup Changes</h3>
           </div>
           {changed.length > 0 && (
-            <Badge className="bg-orange-100 text-orange-700 border border-orange-200">
+            <Badge className="bg-orange-100 text-orange-700 border border-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-800">
               {changed.length} changed
             </Badge>
           )}
         </div>
 
         {loading ? (
-          <div className="flex items-center gap-2 text-sm text-gray-400 py-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
             <Loader2 className="w-4 h-4 animate-spin" /> Checking device configs...
           </div>
         ) : changed.length === 0 ? (
-          <div className="flex items-center gap-2 text-sm text-green-700 py-4">
+          <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400 py-4">
             <CheckCircle2 className="w-4 h-4" /> All device configs match their active reference.
           </div>
         ) : (
-          <div className="divide-y">
+          <div className="divide-y divide-border">
             {changed.slice(0, 6).map((ab) => (
               <div key={ab.device_id} className="flex items-center justify-between py-2">
-                <span className="text-sm font-medium text-gray-800">{ab.device_name}</span>
-                <Badge className="bg-orange-100 text-orange-700 border border-orange-200">
+                <span className="text-sm font-medium text-foreground">{ab.device_name}</span>
+                <Badge className="bg-orange-100 text-orange-700 border border-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-800">
                   🔄 Changed
                 </Badge>
               </div>
@@ -70,7 +70,7 @@ export function BackupChangesWidget() {
           </div>
         )}
 
-        <Link href="/backups" className="flex items-center gap-1 text-sm text-blue-600 hover:underline w-fit">
+        <Link href="/backups" className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline w-fit">
           Review in Backups <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </CardContent>

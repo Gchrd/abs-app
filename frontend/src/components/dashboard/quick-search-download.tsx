@@ -82,12 +82,12 @@ export function QuickSearchDownload() {
     <Card>
       <CardContent className="p-6 space-y-4">
         <div className="flex items-center gap-2">
-          <FileSearch className="w-4 h-4 text-blue-600" />
-          <h3 className="text-gray-900 font-semibold">Quick Search & Download</h3>
+          <FileSearch className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+          <h3 className="text-foreground font-semibold">Quick Search & Download</h3>
         </div>
 
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search by device or date..."
             value={query}
@@ -99,20 +99,20 @@ export function QuickSearchDownload() {
 
         <div className="min-h-[3rem]">
           {loading ? (
-            <div className="flex items-center gap-2 text-sm text-gray-400 py-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
               <Loader2 className="w-4 h-4 animate-spin" /> Loading backups...
             </div>
           ) : query.trim() === "" ? (
-            <p className="text-sm text-gray-400 py-4">Type a device name or date to find a backup to download.</p>
+            <p className="text-sm text-muted-foreground py-4">Type a device name or date to find a backup to download.</p>
           ) : matches.length === 0 ? (
-            <p className="text-sm text-gray-400 py-4">No backups match &quot;{query}&quot;.</p>
+            <p className="text-sm text-muted-foreground py-4">No backups match &quot;{query}&quot;.</p>
           ) : (
-            <div className="divide-y">
+            <div className="divide-y divide-border">
               {matches.map((b) => (
                 <div key={b.id} className="flex items-center justify-between py-2">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-800 truncate">{b.device_name ?? b.device_id}</p>
-                    <p className="text-xs text-gray-500">{formatDate(b.timestamp)}</p>
+                    <p className="text-sm font-medium text-foreground truncate">{b.device_name ?? b.device_id}</p>
+                    <p className="text-xs text-muted-foreground">{formatDate(b.timestamp)}</p>
                   </div>
                   <Button
                     variant="outline"
@@ -134,7 +134,7 @@ export function QuickSearchDownload() {
           )}
         </div>
 
-        <Link href="/backups" className="flex items-center gap-1 text-sm text-blue-600 hover:underline w-fit">
+        <Link href="/backups" className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline w-fit">
           View all backups <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </CardContent>

@@ -56,8 +56,8 @@ export function AuditLogsPage() {
   const getResultBadge = (result: string) => {
     const isSuccess = result === 'success' || result.startsWith('success');
     const variants = {
-      success: 'bg-green-100 text-green-700',
-      failed: 'bg-red-100 text-red-700',
+      success: 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300',
+      failed: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300',
     };
     return (
       <Badge className={isSuccess ? variants.success : variants.failed}>
@@ -73,8 +73,8 @@ export function AuditLogsPage() {
     if (action.startsWith('user_')) return 'text-orange-600';
     if (action.startsWith('schedule_')) return 'text-indigo-600';
     if (action.startsWith('backup_')) return 'text-teal-600';
-    if (action.startsWith('retention_')) return 'text-gray-600';
-    return 'text-gray-600';
+    if (action.startsWith('retention_')) return 'text-muted-foreground';
+    return 'text-muted-foreground';
   };
 
   const formatTimestamp = (timestamp: string) => {
@@ -91,14 +91,14 @@ export function AuditLogsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-gray-900">Audit Logs</h2>
-        <p className="text-gray-500">Track all important system actions and events</p>
+        <h2 className="text-foreground">Audit Logs</h2>
+        <p className="text-muted-foreground">Track all important system actions and events</p>
       </div>
 
       {/* Filters */}
       <div className="flex gap-4 flex-wrap items-center">
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600">User:</span>
+          <span className="text-sm text-muted-foreground">User:</span>
           <Select value={userFilter} onValueChange={setUserFilter}>
             <SelectTrigger className="w-48">
               <SelectValue />
@@ -121,9 +121,9 @@ export function AuditLogsPage() {
       </div>
 
       {/* Info Box */}
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-        <p className="text-sm text-gray-700 mb-2">📝 Audit logs track the following events:</p>
-        <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
+      <div className="bg-muted border border-border rounded-lg p-4">
+        <p className="text-sm text-foreground mb-2">📝 Audit logs track the following events:</p>
+        <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
           <div>
             <span className="text-blue-600">• auth_*</span> - Login attempts
           </div>
@@ -146,7 +146,7 @@ export function AuditLogsPage() {
       </div>
 
       {/* Audit Logs Table */}
-      <div className="border rounded-lg bg-white">
+      <div className="border rounded-lg bg-card">
         <Table>
           <TableHeader>
             <TableRow>
@@ -160,21 +160,21 @@ export function AuditLogsPage() {
           <TableBody>
             {paginatedLogs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-gray-500 py-8">
+                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                   {loading ? 'Loading audit logs...' : 'No audit logs found'}
                 </TableCell>
               </TableRow>
             ) : (
               paginatedLogs.map((log) => (
                 <TableRow key={log.id}>
-                  <TableCell className="text-gray-600">{formatTimestamp(log.timestamp)}</TableCell>
+                  <TableCell className="text-muted-foreground">{formatTimestamp(log.timestamp)}</TableCell>
                   <TableCell>
                     <span className={`px-2 py-1 rounded text-sm ${
-                      log.user === 'admin' 
-                        ? 'bg-blue-100 text-blue-700' 
+                      log.user === 'admin'
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
                         : log.user === 'system'
-                        ? 'bg-gray-100 text-gray-700'
-                        : 'bg-green-100 text-green-700'
+                        ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                        : 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300'
                     }`}>
                       {log.user}
                     </span>
@@ -184,7 +184,7 @@ export function AuditLogsPage() {
                       {log.action}
                     </code>
                   </TableCell>
-                  <TableCell className="text-gray-600">{log.target}</TableCell>
+                  <TableCell className="text-muted-foreground">{log.target}</TableCell>
                   <TableCell>{getResultBadge(log.result)}</TableCell>
                 </TableRow>
               ))
@@ -195,14 +195,14 @@ export function AuditLogsPage() {
 
       {/* Pagination */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-muted-foreground">
           Showing {startIndex + 1}-{Math.min(endIndex, filteredLogs.length)} of {filteredLogs.length} entries
         </p>
         <div className="flex gap-2">
           <button
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
             disabled={currentPage === 1}
-            className="px-3 py-1 text-sm border rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            className="px-3 py-1 text-sm border rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted"
           >
             Previous
           </button>
@@ -212,7 +212,7 @@ export function AuditLogsPage() {
           <button
             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
             disabled={currentPage === totalPages || totalPages === 0}
-            className="px-3 py-1 text-sm border rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            className="px-3 py-1 text-sm border rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted"
           >
             Next
           </button>

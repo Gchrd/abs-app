@@ -50,12 +50,12 @@ export function Sidebar({
                     onClick={() => onNavigate(item.id)}
                     aria-label={item.label}
                     className={cn(
-                      "flex items-center justify-center h-10 w-10 rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                      "group flex items-center justify-center h-10 w-10 rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                       currentPage === item.id &&
                         "bg-sidebar-accent text-sidebar-accent-foreground",
                     )}
                   >
-                    <Icon className="w-5 h-5" />
+                    <Icon className="w-5 h-5 transition-transform duration-150 group-hover:scale-125" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="right">{item.label}</TooltipContent>

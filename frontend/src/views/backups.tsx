@@ -591,7 +591,7 @@ export function BackupsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-2 text-orange-600 border-orange-300 hover:bg-orange-50 font-medium"
+                  className="gap-2 text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-800 hover:bg-orange-50 dark:hover:bg-orange-950 font-medium"
                   disabled={batchAcknowledgeLoading || batchAcceptLatestLoading}
                   onClick={handleKeepPreviousAll}
                 >
@@ -605,7 +605,7 @@ export function BackupsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-2 text-blue-600 border-blue-300 hover:bg-blue-50 font-medium"
+                  className="gap-2 text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950 font-medium"
                   disabled={batchAcknowledgeLoading || batchAcceptLatestLoading}
                   onClick={handleAcceptLatestAll}
                 >
@@ -668,11 +668,11 @@ export function BackupsPage() {
                     </TableCell>
                     <TableCell>
                       {ab.status_changed ? (
-                        <Badge className="bg-orange-100 text-orange-700 border border-orange-200">
+                        <Badge className="bg-orange-100 text-orange-700 border border-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-800">
                           🔄 Changed
                         </Badge>
                       ) : (
-                        <Badge className="bg-green-100 text-green-700 border border-green-200">
+                        <Badge className="bg-green-100 text-green-700 border border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800">
                           ✅ Unchanged
                         </Badge>
                       )}
@@ -696,7 +696,7 @@ export function BackupsPage() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleViewDiff(ab)}
-                            className="gap-1 text-orange-600 border-orange-300 hover:bg-orange-50"
+                            className="gap-1 text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-800 hover:bg-orange-50 dark:hover:bg-orange-950"
                           >
                             <GitCompare className="w-3 h-3" />
                             View Difference
@@ -756,8 +756,8 @@ export function BackupsPage() {
             <h3 className="text-base font-semibold text-foreground">Backup History</h3>
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p className="text-sm text-blue-800">
+          <div className="bg-blue-50 border border-blue-200 dark:bg-blue-950 dark:border-blue-900 rounded-lg p-3">
+            <p className="text-sm text-blue-800 dark:text-blue-300">
               💡 Retention policy automatically keeps the last N backups per device based on schedule settings. Old backups are pruned after successful new backups.
             </p>
           </div>
@@ -785,7 +785,7 @@ export function BackupsPage() {
                   <div key={batch.id} className="border rounded-lg overflow-hidden bg-card shadow-sm">
                     {/* Header bar */}
                     <div
-                      className={`flex items-center justify-between p-3 cursor-pointer ${isExpanded ? 'bg-gray-50 border-b' : 'hover:bg-gray-50'}`}
+                      className={`flex items-center justify-between p-3 cursor-pointer ${isExpanded ? 'bg-muted border-b' : 'hover:bg-muted'}`}
                       onClick={() => toggleBatch(batch.id)}
                     >
                       <div className="flex items-center gap-3 flex-1">
@@ -797,7 +797,7 @@ export function BackupsPage() {
                           <span className="text-xs text-muted-foreground">{dayBackups.length} backup file{dayBackups.length > 1 ? 's' : ''}</span>
                         </div>
                         {hasActiveBackup && (
-                          <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200">
+                          <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800">
                             <Star className="w-3 h-3 fill-amber-500 text-amber-500 mr-1" />
                             Active Backup Present
                           </Badge>
@@ -839,7 +839,7 @@ export function BackupsPage() {
                     {isExpanded && (
                       <div className="bg-card p-2">
                         <Table>
-                          <TableHeader className="bg-gray-50">
+                          <TableHeader className="bg-muted">
                             <TableRow>
                               <TableHead className="w-12 text-center text-xs">#</TableHead>
                               <TableHead className="text-xs">Device</TableHead>
@@ -855,7 +855,7 @@ export function BackupsPage() {
                               const isCurrentlyActive = activeBackups.some(ab => ab.backup_id === backup.id);
                               const isSuccess = backup.status === 'success';
                               return (
-                                <TableRow key={backup.id} className={isCurrentlyActive ? 'bg-amber-50/50' : ''}>
+                                <TableRow key={backup.id} className={isCurrentlyActive ? 'bg-amber-50/50 dark:bg-amber-950/30' : ''}>
                                   <TableCell className="text-xs text-muted-foreground text-center">{idx + 1}</TableCell>
                                   <TableCell>
                                     <div className="flex items-center gap-1.5 font-medium">
@@ -874,9 +874,9 @@ export function BackupsPage() {
                                   </TableCell>
                                   <TableCell>
                                     {isSuccess ? (
-                                      <Badge className="bg-green-100/70 text-green-700 text-[10px] px-1.5 border border-green-200">✅ success</Badge>
+                                      <Badge className="bg-green-100/70 text-green-700 text-[10px] px-1.5 border border-green-200 dark:bg-green-950/70 dark:text-green-300 dark:border-green-800">✅ success</Badge>
                                     ) : (
-                                      <Badge className="bg-red-100/70 text-red-700 text-[10px] px-1.5 border border-red-200">❌ failed</Badge>
+                                      <Badge className="bg-red-100/70 text-red-700 text-[10px] px-1.5 border border-red-200 dark:bg-red-950/70 dark:text-red-300 dark:border-red-800">❌ failed</Badge>
                                     )}
                                   </TableCell>
                                   <TableCell>
@@ -975,11 +975,11 @@ export function BackupsPage() {
             {diffLoading ? (
               <div className="flex items-center justify-center py-20">
                 <Loader2 className="w-8 h-8 animate-spin text-blue-500 mr-3" />
-                <span className="text-gray-500">Loading diff...</span>
+                <span className="text-muted-foreground">Loading diff...</span>
               </div>
             ) : diffData ? (
               <>
-                <div className="mb-2 flex gap-4 text-xs text-gray-500">
+                <div className="mb-2 flex gap-4 text-xs text-muted-foreground">
                   <span>
                     <span className="inline-block w-3 h-3 bg-red-900 rounded mr-1"></span>
                     Removed / Previous
@@ -999,7 +999,7 @@ export function BackupsPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-gray-400 hover:text-gray-600"
+                className="text-muted-foreground hover:text-foreground"
                 onClick={() => {
                   setIsDiffOpen(false);
                   setDiffActiveBackup(null);
@@ -1028,7 +1028,7 @@ export function BackupsPage() {
                       variant="outline"
                       onClick={handleAcceptLatest}
                       disabled={revertingId !== null}
-                      className="text-blue-600 border-blue-300 hover:bg-blue-50 font-medium"
+                      className="text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950 font-medium"
                     >
                       {revertingId === diffActiveBackup?.previous_backup_id ? (
                         <><Loader2 className="w-4 h-4 animate-spin mr-1" /> Setting...</>
@@ -1054,10 +1054,10 @@ export function BackupsPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="py-4 space-y-4">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               You are about to permanently delete all backup configuration files in <strong>{deletingBatchId && (groupedBatches.find(b => b.id === deletingBatchId)?.label || deletingBatchId)}</strong>.
             </p>
-            <div className="bg-red-50 border border-red-200 text-red-800 p-3 rounded text-sm">
+            <div className="bg-red-50 border border-red-200 text-red-800 dark:bg-red-950 dark:border-red-900 dark:text-red-300 p-3 rounded text-sm">
               <p className="font-semibold mb-1">Warning!</p>
               <ul className="list-disc pl-5 space-y-1">
                 <li>This action cannot be undone.</li>
@@ -1065,7 +1065,7 @@ export function BackupsPage() {
               </ul>
             </div>
             <div className="space-y-2 pt-2">
-              <label className="text-sm font-medium text-gray-700">
+              <label className="text-sm font-medium text-foreground">
                 Type <span className="font-bold text-black select-none">I am sure</span> to continue:
               </label>
               <Input

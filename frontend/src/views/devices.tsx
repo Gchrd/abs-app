@@ -268,8 +268,8 @@ export function DevicesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-gray-900">Devices</h2>
-          <p className="text-gray-500">Manage network devices for backup</p>
+          <h2 className="text-foreground">Devices</h2>
+          <p className="text-muted-foreground">Manage network devices for backup</p>
         </div>
         {userRole === 'admin' && (
           <Button onClick={handleAddDevice} className="gap-2" disabled={loading}>
@@ -281,7 +281,7 @@ export function DevicesPage() {
 
       {/* Search Box */}
       <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
           placeholder="Search devices..."
           value={searchQuery}
@@ -292,20 +292,20 @@ export function DevicesPage() {
 
       {/* Info Banner */}
       {devices.some(d => d.enabled === false) && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <p className="text-yellow-800 text-sm">
+        <div className="bg-yellow-50 border border-yellow-200 dark:bg-yellow-950 dark:border-yellow-900 rounded-lg p-4">
+          <p className="text-yellow-800 dark:text-yellow-300 text-sm">
             ⚠️ Disabled devices will be excluded from manual and scheduled backup jobs.
           </p>
         </div>
       )}
 
       {/* Devices Table */}
-      <div className="border rounded-lg bg-white overflow-hidden">
+      <div className="border rounded-lg bg-card overflow-hidden">
         {loading && devices.length === 0 ? (
           <div className="flex items-center justify-center py-12">
             <div className="flex flex-col items-center gap-3">
               <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-              <p className="text-gray-500">Loading devices...</p>
+              <p className="text-muted-foreground">Loading devices...</p>
             </div>
           </div>
         ) : (
@@ -326,7 +326,7 @@ export function DevicesPage() {
             <TableBody>
               {filteredDevices.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                     {searchQuery ? 'No devices match your search.' : 'No devices found. Add a device to get started.'}
                   </TableCell>
                 </TableRow>
@@ -344,7 +344,7 @@ export function DevicesPage() {
                         {userRole === 'admin' ? (
                           <div className="flex items-center gap-2 font-mono text-sm">
                             {revealingId === device.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                             ) : (
                               <span>{revealedId === device.id ? revealedPassword : '••••••••'}</span>
                             )}
@@ -354,7 +354,7 @@ export function DevicesPage() {
                             />
                           </div>
                         ) : (
-                          <span className="font-mono text-sm text-gray-400">****</span>
+                          <span className="font-mono text-sm text-muted-foreground">****</span>
                         )}
                       </TableCell>
                       <TableCell>
@@ -367,7 +367,7 @@ export function DevicesPage() {
                               disabled={togglingId === device.id}
                             />
                           ) : null}
-                          <Badge className={isEnabled ? 'bg-green-100 text-green-700 hover:bg-green-100' : 'bg-gray-100 text-gray-700 hover:bg-gray-100'}>
+                          <Badge className={isEnabled ? 'bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-950 dark:text-green-300 dark:hover:bg-green-950' : 'bg-gray-100 text-gray-700 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-800'}>
                             {isEnabled ? 'Enabled' : 'Disabled'}
                           </Badge>
                         </div>
@@ -556,7 +556,7 @@ export function DevicesPage() {
               />
             </div>
 
-            <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-600">
+            <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground">
               💡 Device credentials are stored encrypted and never shown again.
               {!editingDevice && (
                 <div className="mt-2 text-blue-600">
@@ -608,7 +608,7 @@ export function DevicesPage() {
             {testResult === null ? (
               <div className="flex flex-col items-center gap-4">
                 <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-                <p className="text-gray-600">Connecting to device...</p>
+                <p className="text-muted-foreground">Connecting to device...</p>
               </div>
             ) : (
               <div className="flex flex-col items-center gap-4">

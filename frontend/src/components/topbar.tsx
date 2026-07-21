@@ -2,6 +2,7 @@
 
 import { Button } from "./ui/button";
 import { ThemeToggle } from "./theme-toggle";
+import { LiveClock } from "./live-clock";
 
 export function Topbar({
   username,
@@ -18,6 +19,7 @@ export function Topbar({
         Automated Backup System
       </div>
       <div className="flex items-center gap-3 text-sm">
+        <LiveClock />
         <span className="text-muted-foreground">
           {username} ({role})
         </span>

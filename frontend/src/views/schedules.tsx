@@ -207,8 +207,8 @@ export function SchedulesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-gray-900">Schedules</h2>
-          <p className="text-gray-500">Automated backup schedules (Asia/Jakarta timezone)</p>
+          <h2 className="text-foreground">Schedules</h2>
+          <p className="text-muted-foreground">Automated backup schedules (Asia/Jakarta timezone)</p>
         </div>
         {userRole === 'admin' && (
           <Button onClick={handleAddSchedule} className="gap-2" disabled={loading}>
@@ -219,11 +219,11 @@ export function SchedulesPage() {
       </div>
 
       {/* Info Banner */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <p className="text-blue-800 text-sm mb-2">
+      <div className="bg-blue-50 border border-blue-200 dark:bg-blue-950 dark:border-blue-900 rounded-lg p-4">
+        <p className="text-blue-800 dark:text-blue-300 text-sm mb-2">
           📅 <strong>How scheduling works:</strong>
         </p>
-        <ul className="text-blue-700 text-sm space-y-1 ml-6 list-disc">
+        <ul className="text-blue-700 dark:text-blue-300 text-sm space-y-1 ml-6 list-disc">
           <li>Schedules trigger backup jobs automatically at specified intervals</li>
           <li>Only <strong>enabled devices</strong> will be backed up</li>
           <li>Jobs run in the background and can be monitored in the Jobs page</li>
@@ -232,7 +232,7 @@ export function SchedulesPage() {
       </div>
 
       {/* Schedules Table */}
-      <div className="border rounded-lg bg-white">
+      <div className="border rounded-lg bg-card">
         <Table>
           <TableHeader>
             <TableRow>
@@ -248,7 +248,7 @@ export function SchedulesPage() {
           <TableBody>
             {schedules.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-gray-500 py-8">
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                   {loading ? 'Loading schedules...' : 'No schedules found'}
                 </TableCell>
               </TableRow>
@@ -275,7 +275,7 @@ export function SchedulesPage() {
                     <TableCell>Keep {retention}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Badge className={schedule.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}>
+                        <Badge className={schedule.enabled ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}>
                           {schedule.enabled ? 'Enabled' : 'Disabled'}
                         </Badge>
                       </div>
@@ -321,7 +321,7 @@ export function SchedulesPage() {
                             </Button>
                           </>
                         ) : (
-                          <span className="text-sm text-gray-500">Read only</span>
+                          <span className="text-sm text-muted-foreground">Read only</span>
                         )}
                       </div>
                     </TableCell>
@@ -378,7 +378,7 @@ export function SchedulesPage() {
                 value={formData.runAt}
                 onChange={(e) => setFormData({ ...formData, runAt: e.target.value })}
               />
-              <p className="text-sm text-gray-500 mt-1">Asia/Jakarta timezone</p>
+              <p className="text-sm text-muted-foreground mt-1">Asia/Jakarta timezone</p>
             </div>
 
             <div>
@@ -419,7 +419,7 @@ export function SchedulesPage() {
                     )}
                   </SelectContent>
                 </Select>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   Backup devices with this tag
                 </p>
               </div>

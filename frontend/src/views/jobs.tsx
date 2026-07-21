@@ -39,6 +39,8 @@ export function JobsPage() {
   const [runningManual, setRunningManual] = useState(false);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState('All');
+  const [currentPage, setCurrentPage] = useState(1);
+  const jobsPerPage = 20;
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [jobLog, setJobLog] = useState<string[]>([]);
@@ -89,16 +91,26 @@ export function JobsPage() {
     return () => { mounted = false; clearInterval(interval); };
   }, []);
 
-  const filteredJobs = statusFilter === 'All' 
-    ? jobs 
+  const filteredJobs = statusFilter === 'All'
+    ? jobs
     : jobs.filter(job => job.status === statusFilter.toLowerCase());
+
+  const totalPages = Math.ceil(filteredJobs.length / jobsPerPage);
+  const startIndex = (currentPage - 1) * jobsPerPage;
+  const endIndex = startIndex + jobsPerPage;
+  const paginatedJobs = filteredJobs.slice(startIndex, endIndex);
+
+  const handleStatusFilterChange = (value: string) => {
+    setStatusFilter(value);
+    setCurrentPage(1);
+  };
 
   const getStatusBadge = (status: string) => {
     const variants = {
-      success: 'bg-green-100 text-green-700',
-      failed: 'bg-red-100 text-red-700',
-      running: 'bg-yellow-100 text-yellow-700',
-      queued: 'bg-blue-100 text-blue-700',
+      success: 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300',
+      failed: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300',
+      running: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300',
+      queued: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
     };
     const icons = {
       success: '✅',
@@ -187,8 +199,8 @@ export function JobsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-gray-900">Jobs</h2>
-          <p className="text-gray-500">Backup job history and status</p>
+          <h2 className="text-foreground">Jobs</h2>
+          <p className="text-muted-foreground">Backup job history and status</p>
         </div>
         {userRole === 'admin' && (
           <Button onClick={handleRunManual} className="gap-2" disabled={runningManual || loading}>
@@ -209,8 +221,8 @@ export function JobsPage() {
 
       {/* Status Filter */}
       <div className="flex items-center gap-4">
-        <span className="text-sm text-gray-600">Filter by status:</span>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <span className="text-sm text-muted-foreground">Filter by status:</span>
+        <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
           <SelectTrigger className="w-48">
             <SelectValue />
           </SelectTrigger>
@@ -226,15 +238,15 @@ export function JobsPage() {
 
       {/* Queue Banner */}
       {jobs.some(job => job.status === 'queued') && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-blue-800">
+        <div className="bg-blue-50 border border-blue-200 dark:bg-blue-950 dark:border-blue-900 rounded-lg p-4">
+          <p className="text-blue-800 dark:text-blue-300">
             ⏳ 1 job is currently running. Your job is queued and will start automatically.
           </p>
         </div>
       )}
 
       {/* Jobs Table */}
-      <div className="border rounded-lg bg-white">
+      <div className="border rounded-lg bg-card">
         <Table>
           <TableHeader>
             <TableRow>
@@ -248,7 +260,7 @@ export function JobsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredJobs.map((job) => (
+            {paginatedJobs.map((job) => (
               <TableRow key={job.id}>
                 <TableCell>{`#${job.id}`}</TableCell>
                 <TableCell>{job.triggeredBy}</TableCell>
@@ -289,6 +301,34 @@ export function JobsPage() {
         </Table>
       </div>
 
+      {/* Pagination */}
+      {filteredJobs.length > 0 && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Showing {startIndex + 1}-{Math.min(endIndex, filteredJobs.length)} of {filteredJobs.length} jobs
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 text-sm border rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted"
+            >
+              Previous
+            </button>
+            <span className="px-3 py-1 text-sm text-foreground">
+              Page {currentPage} of {totalPages || 1}
+            </span>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages || totalPages === 0}
+              className="px-3 py-1 text-sm border rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Job Detail Modal */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
         <DialogContent className="max-w-2xl">
@@ -299,17 +339,17 @@ export function JobsPage() {
           {selectedJob && (
             <div className="space-y-4 py-4">
               <div>
-                <h4 className="text-gray-900 mb-2">Details</h4>
+                <h4 className="text-foreground mb-2">Details</h4>
                 <div className="space-y-1 text-sm">
-                  <p><span className="text-gray-600">Triggered by:</span> {selectedJob.triggeredBy}</p>
-                  <p><span className="text-gray-600">Devices:</span> {selectedJob.devices}</p>
-                  <p><span className="text-gray-600">Started:</span> {selectedJob.startedAt ? new Date(selectedJob.startedAt).toLocaleString() : '-'}</p>
-                  <p><span className="text-gray-600">Finished:</span> {selectedJob.finishedAt ? new Date(selectedJob.finishedAt).toLocaleString() : '-'}</p>
+                  <p><span className="text-muted-foreground">Triggered by:</span> {selectedJob.triggeredBy}</p>
+                  <p><span className="text-muted-foreground">Devices:</span> {selectedJob.devices}</p>
+                  <p><span className="text-muted-foreground">Started:</span> {selectedJob.startedAt ? new Date(selectedJob.startedAt).toLocaleString() : '-'}</p>
+                  <p><span className="text-muted-foreground">Finished:</span> {selectedJob.finishedAt ? new Date(selectedJob.finishedAt).toLocaleString() : '-'}</p>
                 </div>
               </div>
 
               <div>
-                <h4 className="text-gray-900 mb-2">Logs</h4>
+                <h4 className="text-foreground mb-2">Logs</h4>
                 <div className="bg-gray-900 text-green-400 p-4 rounded-lg h-64 overflow-auto font-mono text-sm">
                   {loadingLog ? (
                     <div className="text-yellow-400 animate-pulse">Loading logs...</div>

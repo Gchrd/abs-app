@@ -161,8 +161,8 @@ export function UsersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-gray-900">Users</h2>
-          <p className="text-gray-500">Manage web application accounts</p>
+          <h2 className="text-foreground">Users</h2>
+          <p className="text-muted-foreground">Manage web application accounts</p>
         </div>
         {isAdmin && (
           <Button onClick={() => setIsAddDialogOpen(true)} className="gap-2" disabled={loading}>
@@ -173,12 +173,12 @@ export function UsersPage() {
       </div>
 
       {/* Users Table */}
-      <div className="border rounded-lg bg-white">
+      <div className="border rounded-lg bg-card">
         {loading && users.length === 0 ? (
           <div className="flex items-center justify-center py-12">
             <div className="flex flex-col items-center gap-3">
               <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-              <p className="text-gray-500">Loading users...</p>
+              <p className="text-muted-foreground">Loading users...</p>
             </div>
           </div>
         ) : (
@@ -198,8 +198,8 @@ export function UsersPage() {
                 <TableCell>
                   <span className={`px-2 py-1 rounded text-sm ${
                     user.role === 'admin' 
-                      ? 'bg-blue-100 text-blue-700' 
-                      : 'bg-gray-100 text-gray-700'
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300' 
+                      : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
                   }`}>
                     {user.role}
                   </span>
@@ -240,7 +240,7 @@ export function UsersPage() {
                         </Button>
                       </>
                     ) : (
-                      <span className="text-sm text-gray-500">Read only</span>
+                      <span className="text-sm text-muted-foreground">Read only</span>
                     )}
                   </div>
                 </TableCell>
