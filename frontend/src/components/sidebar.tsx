@@ -1,15 +1,27 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import {
+  LayoutDashboard,
+  HardDrive,
+  Calendar,
+  Archive,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
-const MENU_ITEMS = [
-  { id: "dashboard", label: "Dashboard" },
-  { id: "devices", label: "Devices" },
-  { id: "schedules", label: "Schedules" },
-  { id: "jobs", label: "Jobs" },
-  { id: "backups", label: "Backups" },
-  { id: "audit-logs", label: "Audit Logs" },
-  { id: "users", label: "Users" },
+const MENU_ITEMS: { id: string; label: string; icon: LucideIcon; adminOnly?: boolean }[] = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "devices", label: "Devices", icon: HardDrive },
+  { id: "backup-schedule", label: "Backup Schedule", icon: Calendar },
+  { id: "backups", label: "Backups", icon: Archive },
+  { id: "user-settings", label: "User Settings", icon: Users, adminOnly: true },
 ];
 
 export function Sidebar({
@@ -22,27 +34,36 @@ export function Sidebar({
   userRole: "admin" | "viewer";
 }) {
   return (
-    <aside className="w-60 bg-slate-950 text-slate-50 flex flex-col">
-      <div className="px-4 py-4 font-semibold border-b border-slate-800">
-        ABS Web App
-      </div>
-      <nav className="flex-1 px-2 py-4 space-y-1">
-        {MENU_ITEMS.map((item) => {
-          if (item.id === "users" && userRole !== "admin") return null;
-          return (
-            <button
-              key={item.id}
-              onClick={() => onNavigate(item.id)}
-              className={cn(
-                "w-full text-left px-3 py-2 rounded-md text-sm hover:bg-slate-800",
-                currentPage === item.id && "bg-slate-800",
-              )}
-            >
-              {item.label}
-            </button>
-          );
-        })}
-      </nav>
-    </aside>
+    <TooltipProvider delayDuration={100}>
+      <aside className="w-16 bg-sidebar text-sidebar-foreground flex flex-col items-center border-r border-sidebar-border">
+        <div className="h-14 flex items-center justify-center border-b border-sidebar-border w-full">
+          <span className="font-bold text-sm">ABS</span>
+        </div>
+        <nav className="flex-1 py-4 flex flex-col items-center gap-1">
+          {MENU_ITEMS.map((item) => {
+            if (item.adminOnly && userRole !== "admin") return null;
+            const Icon = item.icon;
+            return (
+              <Tooltip key={item.id}>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => onNavigate(item.id)}
+                    aria-label={item.label}
+                    className={cn(
+                      "flex items-center justify-center h-10 w-10 rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                      currentPage === item.id &&
+                        "bg-sidebar-accent text-sidebar-accent-foreground",
+                    )}
+                  >
+                    <Icon className="w-5 h-5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right">{item.label}</TooltipContent>
+              </Tooltip>
+            );
+          })}
+        </nav>
+      </aside>
+    </TooltipProvider>
   );
 }

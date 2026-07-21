@@ -6,6 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { HardDrive, CheckCircle, XCircle, Calendar, AlertCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { apiGet } from "@/lib/api";
+import { StatCard } from "@/components/dashboard/stat-card";
+import { QuickSearchDownload } from "@/components/dashboard/quick-search-download";
+import { BackupChangesWidget } from "@/components/dashboard/backup-changes-widget";
 
 interface Job {
   id: number;
@@ -45,6 +48,7 @@ export function DashboardPage() {
     failedBackups: 0,
     activeSchedules: 0,
   });
+  const [trend, setTrend] = useState<{ success: number[]; failed: number[] }>({ success: [], failed: [] });
   const [recentJobs, setRecentJobs] = useState<Job[]>([]);
 
   useEffect(() => {
@@ -65,7 +69,7 @@ export function DashboardPage() {
         // Calculate backup stats from recent jobs (last 7 days)
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        
+
         const recentJobsLast7Days = jobs.filter(job => {
           const jobDate = new Date(job.started_at);
           return jobDate >= sevenDaysAgo;
@@ -80,6 +84,26 @@ export function DashboardPage() {
           failedBackups,
           activeSchedules,
         });
+
+        // Bucket last 7 days (oldest -> newest) for a tiny trend row per stat
+        const dayKey = (d: Date) => d.toISOString().slice(0, 10);
+        const successByDay: Record<string, number> = {};
+        const failedByDay: Record<string, number> = {};
+        for (const job of recentJobsLast7Days) {
+          const key = dayKey(new Date(job.started_at));
+          if (job.status === 'success') successByDay[key] = (successByDay[key] || 0) + 1;
+          if (job.status === 'failed') failedByDay[key] = (failedByDay[key] || 0) + 1;
+        }
+        const days: string[] = [];
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date();
+          d.setDate(d.getDate() - i);
+          days.push(dayKey(d));
+        }
+        setTrend({
+          success: days.map(d => successByDay[d] || 0),
+          failed: days.map(d => failedByDay[d] || 0),
+        });
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
       }
@@ -89,10 +113,10 @@ export function DashboardPage() {
   }, []);
 
   const statsDisplay = [
-    { label: 'Total Devices', value: stats.totalDevices.toString(), icon: HardDrive, color: 'text-blue-600', bgColor: 'bg-blue-100' },
-    { label: 'Successful Backups (7 days)', value: stats.successfulBackups.toString(), icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-100' },
-    { label: 'Failed Backups (7 days)', value: stats.failedBackups.toString(), icon: XCircle, color: 'text-red-600', bgColor: 'bg-red-100' },
-    { label: 'Active Schedules', value: stats.activeSchedules.toString(), icon: Calendar, color: 'text-purple-600', bgColor: 'bg-purple-100' },
+    { label: 'Total Devices', value: stats.totalDevices.toString(), icon: HardDrive, color: 'text-blue-600', bgColor: 'bg-blue-100', gradient: 'from-blue-50 to-white' },
+    { label: 'Successful Backups (7 days)', value: stats.successfulBackups.toString(), icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-100', gradient: 'from-green-50 to-white', trend: trend.success },
+    { label: 'Failed Backups (7 days)', value: stats.failedBackups.toString(), icon: XCircle, color: 'text-red-600', bgColor: 'bg-red-100', gradient: 'from-red-50 to-white', trend: trend.failed },
+    { label: 'Active Schedules', value: stats.activeSchedules.toString(), icon: Calendar, color: 'text-purple-600', bgColor: 'bg-purple-100', gradient: 'from-purple-50 to-white' },
   ];
 
   const getStatusBadge = (status: string) => {
@@ -107,8 +131,8 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-gray-900">Dashboard</h2>
-        <p className="text-gray-500">Overview of your backup system</p>
+        <h2 className="text-foreground">Dashboard</h2>
+        <p className="text-muted-foreground">Overview of your backup system</p>
       </div>
 
       {/* Viewer Info Banner */}
@@ -126,30 +150,21 @@ export function DashboardPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {statsDisplay.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <Card key={stat.label}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">{stat.label}</p>
-                    <p className="text-gray-900 mt-2">{stat.value}</p>
-                  </div>
-                  <div className={`w-12 h-12 ${stat.bgColor} rounded-lg flex items-center justify-center`}>
-                    <Icon className={`w-6 h-6 ${stat.color}`} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+        {statsDisplay.map((stat) => (
+          <StatCard key={stat.label} {...stat} />
+        ))}
+      </div>
+
+      {/* Quick Search & Backup Changes Widgets */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <QuickSearchDownload />
+        <BackupChangesWidget />
       </div>
 
       {/* Recent Jobs Table */}
       <Card>
         <CardContent className="p-6">
-          <h3 className="text-gray-900 mb-4">Recent Jobs</h3>
+          <h3 className="text-foreground mb-4">Recent Jobs</h3>
           <div className="border rounded-lg">
             <Table>
               <TableHeader>
@@ -165,7 +180,7 @@ export function DashboardPage() {
               <TableBody>
                 {recentJobs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                       No jobs yet. Run your first backup from the Jobs page.
                     </TableCell>
                   </TableRow>

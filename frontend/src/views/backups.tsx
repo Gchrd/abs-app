@@ -3,11 +3,12 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Download, Search, GitCompare, Star, Loader2, ChevronDown, ChevronRight, Trash2, FolderDown } from 'lucide-react';
+import { Eye, Download, Search, GitCompare, Star, Loader2, ChevronDown, ChevronRight, Trash2, FolderDown, History } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiGet, apiGetBlob, apiGetText, apiPut, apiPost, downloadBackupBatch, deleteBackupBatch, downloadActiveBackups } from '@/lib/api';
 
@@ -571,17 +572,18 @@ export function BackupsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-gray-900">Backups</h2>
-        <p className="text-gray-500">Browse and manage backup configurations</p>
+        <h2 className="text-foreground">Backups</h2>
+        <p className="text-muted-foreground">Browse and manage backup configurations</p>
       </div>
 
-      {/* ── Tabel 1: Active Backups ── */}
-      <div className="space-y-3">
+      {/* ── Active Backup ── */}
+      <Card>
+        <CardContent className="p-6 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Star className="w-4 h-4 text-amber-500" />
-            <h3 className="text-base font-semibold text-gray-800">Active Backup</h3>
-            <span className="text-xs text-gray-500">(1 per device — config's references)</span>
+            <h3 className="text-base font-semibold text-foreground">Active Backup</h3>
+            <span className="text-xs text-muted-foreground">(1 per device — config&apos;s references)</span>
           </div>
           <div className="flex items-center gap-2">
             {isAdmin && activeBackups.some(ab => ab.status_changed) && (
@@ -633,15 +635,15 @@ export function BackupsPage() {
           </div>
         </div>
 
-        <div className="border rounded-lg bg-white">
+        <div className="border rounded-lg">
           {activeLoading ? (
             <div className="flex items-center justify-center py-10">
               <Loader2 className="w-6 h-6 animate-spin text-blue-500 mr-2" />
-              <span className="text-gray-500 text-sm">Loading active backups...</span>
+              <span className="text-muted-foreground text-sm">Loading active backups...</span>
             </div>
           ) : activeBackups.length === 0 ? (
             <div className="flex items-center justify-center py-10">
-              <p className="text-gray-400 text-sm"> Inactive backup</p>
+              <p className="text-muted-foreground text-sm"> Inactive backup</p>
             </div>
           ) : (
             <Table>
@@ -662,7 +664,7 @@ export function BackupsPage() {
                     <TableCell className="text-sm">{formatDate(ab.timestamp)}</TableCell>
                     <TableCell>{formatSize(ab.size)}</TableCell>
                     <TableCell>
-                      <code className="text-xs bg-gray-100 px-2 py-1 rounded">{ab.hash.slice(0, 8)}</code>
+                      <code className="text-xs bg-muted px-2 py-1 rounded">{ab.hash.slice(0, 8)}</code>
                     </TableCell>
                     <TableCell>
                       {ab.status_changed ? (
@@ -708,63 +710,69 @@ export function BackupsPage() {
             </Table>
           )}
         </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* ── Filters for History Table ── */}
-      <div className="flex gap-4 flex-wrap">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600">Device:</span>
-          <Select value={deviceFilter} onValueChange={setDeviceFilter}>
-            <SelectTrigger className="w-48">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {devices.map(device => (
-                <SelectItem key={device} value={device}>{device}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      {/* ── Filter Toolbar ── */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex gap-4 flex-wrap items-center">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Device:</span>
+              <Select value={deviceFilter} onValueChange={setDeviceFilter}>
+                <SelectTrigger className="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {devices.map(device => (
+                    <SelectItem key={device} value={device}>{device}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600">Date Range:</span>
-          <Input type="date" className="w-48" />
-          <span className="text-sm text-gray-600">to</span>
-          <Input type="date" className="w-48" />
-        </div>
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search backups..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
 
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <Input
-            placeholder="Search backups..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-      </div>
+            <Badge variant="outline" className="shrink-0">
+              {filteredBackups.length} backup{filteredBackups.length === 1 ? '' : 's'} found
+            </Badge>
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Retention Info */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <p className="text-sm text-blue-800">
-          💡 Retention policy automatically keeps the last N backups per device based on schedule settings. Old backups are pruned after successful new backups.
-        </p>
-      </div>
+      {/* ── Backup History ── */}
+      <Card>
+        <CardContent className="p-6 space-y-3">
+          <div className="flex items-center gap-2">
+            <History className="w-4 h-4 text-muted-foreground" />
+            <h3 className="text-base font-semibold text-foreground">Backup History</h3>
+          </div>
 
-      {/* ── Tabel 2: Backup History ── */}
-      <div className="space-y-3">
-        <h3 className="text-base font-semibold text-gray-800">Backup History</h3>
-        <div className="bg-white rounded-lg">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-sm text-blue-800">
+              💡 Retention policy automatically keeps the last N backups per device based on schedule settings. Old backups are pruned after successful new backups.
+            </p>
+          </div>
+
+        <div className="rounded-lg">
           {loading && backups.length === 0 ? (
             <div className="flex items-center justify-center py-12 border rounded-lg">
               <div className="flex flex-col items-center gap-3">
                 <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-                <p className="text-gray-500">Loading backups...</p>
+                <p className="text-muted-foreground">Loading backups...</p>
               </div>
             </div>
           ) : groupedBatches.length === 0 ? (
             <div className="flex items-center justify-center py-12 border rounded-lg">
-              <p className="text-gray-500">No backups found</p>
+              <p className="text-muted-foreground">No backups found</p>
             </div>
           ) : (
             <div className="flex flex-col gap-3">
@@ -774,19 +782,19 @@ export function BackupsPage() {
                 const hasActiveBackup = dayBackups.some(b => activeBackups.some(ab => ab.backup_id === b.id));
 
                 return (
-                  <div key={batch.id} className="border rounded-lg overflow-hidden bg-white shadow-sm">
+                  <div key={batch.id} className="border rounded-lg overflow-hidden bg-card shadow-sm">
                     {/* Header bar */}
                     <div
                       className={`flex items-center justify-between p-3 cursor-pointer ${isExpanded ? 'bg-gray-50 border-b' : 'hover:bg-gray-50'}`}
                       onClick={() => toggleBatch(batch.id)}
                     >
                       <div className="flex items-center gap-3 flex-1">
-                        <span className="text-gray-400">
+                        <span className="text-muted-foreground">
                           {isExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
                         </span>
                         <div className="flex flex-col">
-                          <span className="font-semibold text-gray-800">{batch.label}</span>
-                          <span className="text-xs text-gray-500">{dayBackups.length} backup file{dayBackups.length > 1 ? 's' : ''}</span>
+                          <span className="font-semibold text-foreground">{batch.label}</span>
+                          <span className="text-xs text-muted-foreground">{dayBackups.length} backup file{dayBackups.length > 1 ? 's' : ''}</span>
                         </div>
                         {hasActiveBackup && (
                           <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200">
@@ -829,7 +837,7 @@ export function BackupsPage() {
 
                     {/* Expanded Content */}
                     {isExpanded && (
-                      <div className="bg-white p-2">
+                      <div className="bg-card p-2">
                         <Table>
                           <TableHeader className="bg-gray-50">
                             <TableRow>
@@ -848,7 +856,7 @@ export function BackupsPage() {
                               const isSuccess = backup.status === 'success';
                               return (
                                 <TableRow key={backup.id} className={isCurrentlyActive ? 'bg-amber-50/50' : ''}>
-                                  <TableCell className="text-xs text-gray-400 text-center">{idx + 1}</TableCell>
+                                  <TableCell className="text-xs text-muted-foreground text-center">{idx + 1}</TableCell>
                                   <TableCell>
                                     <div className="flex items-center gap-1.5 font-medium">
                                       {backup.device_name ?? String(backup.device_id)}
@@ -860,9 +868,9 @@ export function BackupsPage() {
                                   <TableCell className="text-sm">
                                     {new Date(backup.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                                   </TableCell>
-                                  <TableCell className="text-sm text-gray-600">{formatSize(backup.size_bytes)}</TableCell>
+                                  <TableCell className="text-sm text-muted-foreground">{formatSize(backup.size_bytes)}</TableCell>
                                   <TableCell>
-                                    <code className="text-xs bg-gray-100/80 px-1.5 py-0.5 rounded text-gray-500">{backup.hash.slice(0, 8)}</code>
+                                    <code className="text-xs bg-muted/80 px-1.5 py-0.5 rounded text-muted-foreground">{backup.hash.slice(0, 8)}</code>
                                   </TableCell>
                                   <TableCell>
                                     {isSuccess ? (
@@ -882,7 +890,7 @@ export function BackupsPage() {
                                           className="h-8 w-8 p-0"
                                           disabled={previewingId === backup.id || downloadingId === backup.id}
                                         >
-                                          {previewingId === backup.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4 text-gray-500" />}
+                                          {previewingId === backup.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4 text-muted-foreground" />}
                                         </Button>
                                         {!isCurrentlyActive && isAdmin && (
                                           <Button
@@ -893,12 +901,12 @@ export function BackupsPage() {
                                             className="h-8 w-8 p-0"
                                             disabled={settingActiveId === backup.id}
                                           >
-                                            {settingActiveId === backup.id ? <Loader2 className="w-4 h-4 animate-spin text-amber-500" /> : <Star className="w-4 h-4 text-gray-400 hover:text-amber-500" />}
+                                            {settingActiveId === backup.id ? <Loader2 className="w-4 h-4 animate-spin text-amber-500" /> : <Star className="w-4 h-4 text-muted-foreground hover:text-amber-500" />}
                                           </Button>
                                         )}
                                       </div>
                                     ) : (
-                                      <span className="text-xs text-gray-400">-</span>
+                                      <span className="text-xs text-muted-foreground">-</span>
                                     )}
                                   </TableCell>
                                 </TableRow>
@@ -914,7 +922,8 @@ export function BackupsPage() {
             </div>
           )}
         </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* ── Preview Modal ── */}
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>

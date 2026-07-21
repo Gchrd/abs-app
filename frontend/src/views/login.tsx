@@ -5,6 +5,7 @@ import { Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { EyeToggleButton } from '@/components/eye-toggle-button';
 import { toast } from 'sonner';
 import { apiPost } from '@/lib/api';
 
@@ -21,6 +22,7 @@ interface LoginResponse {
 export function LoginPage({ onLogin }: LoginPageProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -57,15 +59,15 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-lg shadow-lg p-8">
+        <div className="bg-card rounded-lg shadow-lg p-8">
           <div className="flex justify-center mb-6">
             <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
               <Lock className="w-8 h-8 text-blue-600" />
             </div>
           </div>
           
-          <h2 className="text-center text-gray-900 mb-2">🔒 Login</h2>
-          <p className="text-center text-gray-500 text-sm mb-8">
+          <h2 className="text-center text-foreground mb-2">🔒 Login</h2>
+          <p className="text-center text-muted-foreground text-sm mb-8">
             Automated Backup System
           </p>
 
@@ -84,14 +86,19 @@ export function LoginPage({ onLogin }: LoginPageProps) {
 
             <div>
               <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder=""
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1"
-              />
+              <div className="relative mt-1">
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder=""
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pr-10"
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <EyeToggleButton visible={showPassword} onClick={() => setShowPassword((v) => !v)} />
+                </div>
+              </div>
             </div>
 
             <Button type="submit" className="w-full" disabled={isLoading}>

@@ -60,14 +60,14 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
-        <div className="text-gray-500 text-sm">Loading...</div>
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="text-muted-foreground text-sm">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-background">
       <Sidebar
         currentPage={currentPage}
         onNavigate={handleNavigate}

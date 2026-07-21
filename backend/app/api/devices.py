@@ -96,6 +96,16 @@ def get_available_tags(current_user=Depends(get_current_user), db: Session = Dep
                     tags_set.add(tag)
     return {"tags": sorted(list(tags_set))}
 
+@router.get("/{device_id}/credentials")
+def get_device_credentials(device_id: int, db: Session = Depends(get_db), current_user=Depends(require_admin)):
+    d = db.get(Device, device_id)
+    if not d:
+        raise HTTPException(404, "Not found")
+    password = dec(d.password_enc)
+    audit_event(user=current_user.username, action="device_view_password", target=d.hostname, result="success")
+    return {"password": password}
+
+
 @router.post("/{device_id}/test", response_model=TestResult)
 def test_device(device_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     d = db.get(Device, device_id)

@@ -10,7 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Plus, Search, Trash2, Edit, TestTube, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, Search, Trash2, Edit, TestTube, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { EyeToggleButton } from '@/components/eye-toggle-button';
 import { toast } from 'sonner';
 
 interface Device {
@@ -33,6 +34,9 @@ export function DevicesPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [testingConnection, setTestingConnection] = useState(false);
   const [togglingId, setTogglingId] = useState<string | number | null>(null);
+  const [revealedId, setRevealedId] = useState<string | number | null>(null);
+  const [revealedPassword, setRevealedPassword] = useState<string | null>(null);
+  const [revealingId, setRevealingId] = useState<string | number | null>(null);
   const [userRole] = useState<'admin' | 'viewer' | null>(() => {
     try {
       const u = typeof window !== 'undefined' ? localStorage.getItem('abs_user') : null;
@@ -208,6 +212,25 @@ export function DevicesPage() {
     }
   };
 
+  const handleTogglePasswordReveal = async (device: Device) => {
+    if (revealedId === device.id) {
+      setRevealedId(null);
+      setRevealedPassword(null);
+      return;
+    }
+    setRevealingId(device.id);
+    try {
+      const res = await apiGet<{ password: string }>(`/devices/${device.id}/credentials`);
+      setRevealedId(device.id);
+      setRevealedPassword(res.password);
+    } catch (err: unknown) {
+      const msg = (err && typeof err === 'object' && 'message' in err) ? (err as { message?: string }).message : String(err);
+      toast.error('Failed to reveal password: ' + (msg || 'Unknown error'));
+    } finally {
+      setRevealingId(null);
+    }
+  };
+
   const handleTestConnection = async (deviceId?: number | string) => {
     setIsTestDialogOpen(true);
     setTestResult(null);
@@ -294,6 +317,7 @@ export function DevicesPage() {
                 <TableHead>Vendor</TableHead>
                 <TableHead>Protocol</TableHead>
                 <TableHead>Port</TableHead>
+                <TableHead>Password</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Last Backup</TableHead>
                 <TableHead>Actions</TableHead>
@@ -302,7 +326,7 @@ export function DevicesPage() {
             <TableBody>
               {filteredDevices.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                     {searchQuery ? 'No devices match your search.' : 'No devices found. Add a device to get started.'}
                   </TableCell>
                 </TableRow>
@@ -316,6 +340,23 @@ export function DevicesPage() {
                       <TableCell>{device.vendor}</TableCell>
                       <TableCell>{device.protocol}</TableCell>
                       <TableCell>{device.port}</TableCell>
+                      <TableCell>
+                        {userRole === 'admin' ? (
+                          <div className="flex items-center gap-2 font-mono text-sm">
+                            {revealingId === device.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                            ) : (
+                              <span>{revealedId === device.id ? revealedPassword : '••••••••'}</span>
+                            )}
+                            <EyeToggleButton
+                              visible={revealedId === device.id}
+                              onClick={() => handleTogglePasswordReveal(device)}
+                            />
+                          </div>
+                        ) : (
+                          <span className="font-mono text-sm text-gray-400">****</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           {userRole === 'admin' ? (
