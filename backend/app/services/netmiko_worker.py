@@ -146,13 +146,22 @@ def _connect_telnet_manual(
     tn.write(password.encode('ascii') + b"\n")
     time.sleep(2)
     
-    # Enter enable mode if secret provided
-    if secret:
-        tn.write(b"enable\n")
-        time.sleep(1)
-        tn.expect([b"Password:", b"password:"], timeout=15)
-        tn.write(secret.encode('ascii') + b"\n")
+    # Always try to reach privileged/enable mode, even if no enable secret was
+    # configured - some devices allow "enable" with a blank password. Previously
+    # this was skipped entirely whenever `secret` was empty (same bug fixed on
+    # the SSH path, missed here), leaving the session in user EXEC mode where
+    # commands like 'show running-config' get rejected as "Invalid input
+    # detected" instead of a clear permission error.
+    tn.write(b"enable\n")
+    time.sleep(1)
+    idx, _, _ = tn.expect([b"Password:", b"password:"], timeout=5)
+    if idx != -1:
+        # Device asked for an enable password - send whatever we have
+        # (blank if none configured; some devices accept that too).
+        tn.write((secret or "").encode('ascii') + b"\n")
         time.sleep(2)
+    # else: no password prompt within 5s - device went straight to privileged
+    # mode (blank-enable or already-privileged login), nothing more to send.
     
     # Disable paging (try multiple times for reliability)
     tn.write(b"terminal length 0\n")
