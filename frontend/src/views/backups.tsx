@@ -55,6 +55,7 @@ interface JobSummary {
   id: number;
   status: string;
   started_at: string;
+  triggered_by: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -282,8 +283,11 @@ export function BackupsPage() {
     try {
       const jobs = await apiGet<JobSummary[]>('/jobs');
       // jobs are most-recent-first; skip an in-progress run so devices not
-      // reached yet aren't briefly flagged as "failed" mid-run
-      const latestJob = jobs.find(j => j.status !== 'running');
+      // reached yet aren't briefly flagged as "failed" mid-run, and skip
+      // single-device "Backup Now" runs (triggered_by "manual (hostname)")
+      // - those only ever touch one device, so using one as the fleet-wide
+      // reference point would wrongly flag every other device as failed.
+      const latestJob = jobs.find(j => j.status !== 'running' && !j.triggered_by.startsWith('manual ('));
       if (!latestJob) {
         setSucceededDeviceIdsInLatestRun(new Set());
         return;
@@ -701,13 +705,13 @@ export function BackupsPage() {
                       <code className="text-xs bg-muted px-2 py-1 rounded">{ab.hash.slice(0, 8)}</code>
                     </TableCell>
                     <TableCell>
-                      {!succeededDeviceIdsInLatestRun.has(ab.device_id) ? (
-                        <Badge className="bg-red-100 text-red-700 border border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800" title="This device's most recent backup run did not succeed - config status below may be stale.">
-                          ⚠️ Backup Failed
-                        </Badge>
-                      ) : ab.status_changed ? (
+                      {ab.status_changed ? (
                         <Badge className="bg-orange-100 text-orange-700 border border-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-800">
                           🔄 Changed
+                        </Badge>
+                      ) : !succeededDeviceIdsInLatestRun.has(ab.device_id) ? (
+                        <Badge className="bg-red-100 text-red-700 border border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800" title="This device's most recent backup run did not succeed - it may or may not have changed since the last confirmed check.">
+                          ⚠️ Backup Failed
                         </Badge>
                       ) : (
                         <Badge className="bg-green-100 text-green-700 border border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800">

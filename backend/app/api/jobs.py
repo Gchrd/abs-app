@@ -4,7 +4,7 @@ from ..database import SessionLocal
 from ..models import Device, Job, Backup
 from ..utils.crypto import dec
 from ..utils.timeutil import tznow
-from ..services.netmiko_worker import fetch_running_config
+from ..services.netmiko_worker import fetch_running_config, NonRetryableBackupError
 from ..services.job_controller import submit
 from ..utils.config_sanitizer import sanitize_config
 from hashlib import sha256
@@ -94,6 +94,14 @@ async def _run_backup_devices(job_id: int, device_list: list[dict], triggered_us
                     db.commit()
                     log_lines.append(f"[{device_info['hostname']}] Backup success ({len(content)} bytes, path={path})")
                     break  # Success, exit retry loop
+
+                except NonRetryableBackupError as e:
+                    # Device rejected the command itself - retrying with the same
+                    # command will fail the same way every time. Fail fast instead
+                    # of wasting ~105s and risking tripping the device's own
+                    # lockout policy from repeated attempts.
+                    log_lines.append(f"[{device_info['hostname']}] Backup failed (not retrying - device rejected the command): ({str(e)})")
+                    break
 
                 except Exception as e:
                     if attempt < max_attempts - 1:

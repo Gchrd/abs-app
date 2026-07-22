@@ -3,6 +3,16 @@ from hashlib import sha256
 from pathlib import Path
 from ..settings import settings
 
+
+class NonRetryableBackupError(Exception):
+    """A backup failure that retrying won't fix (e.g. the device rejected the
+    command itself) - as opposed to transient issues like a timeout or a busy
+    device. Callers should fail fast on this instead of retrying, both because
+    it wastes time on a guaranteed-repeat failure and because hammering a
+    device with repeated login/command attempts can trip its own lockout
+    policy, breaking even manual troubleshooting logins right after."""
+    pass
+
 # device_type hanya untuk SSH
 VENDOR_MAP = {
     "Cisco (IOS Router/Switch)": "cisco_ios",
@@ -353,7 +363,7 @@ def fetch_running_config(
 
     if _looks_like_cli_error(output):
         transcript_note = f" | Session transcript tail: {session_log_tail!r}" if session_log_tail else ""
-        raise Exception(
+        raise NonRetryableBackupError(
             f"Backup failure: Device returned a command error instead of configuration "
             f"(command '{cmd or _get_config_command(vendor)}' may be wrong for this device's "
             f"vendor/firmware, or the session wasn't in the right privilege level). "

@@ -6,7 +6,7 @@ from ..settings import settings
 from ..database import SessionLocal
 from ..models import Schedule, Device, Job, Backup
 from ..utils.crypto import dec
-from .netmiko_worker import fetch_running_config
+from .netmiko_worker import fetch_running_config, NonRetryableBackupError
 from ..utils.config_sanitizer import sanitize_config
 from .audit_log import audit_event
 from hashlib import sha256
@@ -130,6 +130,14 @@ async def run_scheduled_backup(schedule_id: int, schedule_name: str):
                     log_lines.append(f"[{device_info['hostname']}] Backup success ({len(content)} bytes, path={path})")
                     break # Success, exit retry loop
                     
+                except NonRetryableBackupError as e:
+                    # Device rejected the command itself - retrying with the same
+                    # command will fail the same way every time. Fail fast instead
+                    # of wasting ~105s and risking tripping the device's own
+                    # lockout policy from repeated attempts.
+                    log_lines.append(f"[{device_info['hostname']}] Backup failed (not retrying - device rejected the command): ({str(e)})")
+                    break
+
                 except Exception as e:
                     if attempt < max_attempts - 1:
                         # Log the failure and wait before retrying
