@@ -211,8 +211,13 @@ def _connect_ssh_normal(
     # platforms don't support enable mode at all.
     try:
         conn.enable(check_state=False)
-    except Exception:
-        pass
+        conn._abs_enable_error = None  # type: ignore[attr-defined]
+    except Exception as e:
+        # Don't swallow this silently - stash it on the connection so
+        # fetch_running_config can report exactly why enable() failed
+        # (wrong/missing secret, unexpected prompt, timeout, etc.) instead
+        # of just showing the downstream "Invalid input detected" reply.
+        conn._abs_enable_error = str(e)  # type: ignore[attr-defined]
 
     return conn
 
@@ -242,6 +247,7 @@ def fetch_running_config(
     output = ""
     tn = None  # For telnetlib connection
     session_log_tail = ""  # raw transcript for diagnostics, captured before cleanup deletes it
+    enable_error = "n/a (telnet path)"  # why conn.enable() failed, if it did (SSH path only)
 
     try:
         # SAFE protocol detection (strip whitespace)
@@ -307,6 +313,8 @@ def fetch_running_config(
                 session_log=session_log,
             )
             
+            enable_error = getattr(conn, "_abs_enable_error", "unknown") or "succeeded, no error"
+
             # Get appropriate command for this vendor
             config_cmd = cmd or _get_config_command(vendor)
             output = conn.send_command(config_cmd, read_timeout=60)
@@ -367,7 +375,7 @@ def fetch_running_config(
             f"Backup failure: Device returned a command error instead of configuration "
             f"(command '{cmd or _get_config_command(vendor)}' may be wrong for this device's "
             f"vendor/firmware, or the session wasn't in the right privilege level). "
-            f"Raw reply: {output.strip()[:200]!r}{transcript_note}"
+            f"Raw reply: {output.strip()[:200]!r} | enable() result: {enable_error!r}{transcript_note}"
         )
 
     # Simpan ke file

@@ -72,11 +72,15 @@ export function DashboardPage() {
         const jobs = await apiGet<Job[]>('/jobs');
         setRecentJobs(jobs.slice(0, 5)); // Top 5 recent jobs
 
-        // Successful/Failed is counted per switch, based on the LATEST backup run
-        // only - not "ever succeeded in the last 7 days". A switch that succeeded
-        // days ago but failed on the most recent run must show as failed now, so
-        // this reflects current health rather than a stale historical success.
-        const latestJob = jobs[0];
+        // Successful/Failed is counted per switch, based on the LATEST fleet-wide
+        // backup run only - not "ever succeeded in the last 7 days". A switch that
+        // succeeded days ago but failed on the most recent run must show as failed
+        // now, so this reflects current health rather than a stale historical
+        // success. Single-device "Backup Now" runs (triggered_by "manual
+        // (hostname)") are skipped when picking the reference job - those only
+        // ever touch one device, so using one here would wrongly flag every other
+        // device as failed. Same reasoning as the Backups page's status badge.
+        const latestJob = jobs.find(j => j.status !== 'running' && !j.triggered_by.startsWith('manual ('));
         let successfulBackups = 0;
         let failedBackups = enabledDevices.length;
 
