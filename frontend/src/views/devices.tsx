@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Plus, Search, Trash2, Edit, TestTube, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Plus, Search, Trash2, Edit, TestTube, CheckCircle, XCircle, Loader2, UploadCloud } from 'lucide-react';
 import { EyeToggleButton } from '@/components/eye-toggle-button';
 import { toast } from 'sonner';
 
@@ -37,6 +37,7 @@ export function DevicesPage() {
   const [revealedId, setRevealedId] = useState<string | number | null>(null);
   const [revealedPassword, setRevealedPassword] = useState<string | null>(null);
   const [revealingId, setRevealingId] = useState<string | number | null>(null);
+  const [backingUpId, setBackingUpId] = useState<string | number | null>(null);
   const [userRole] = useState<'admin' | 'viewer' | null>(() => {
     try {
       const u = typeof window !== 'undefined' ? localStorage.getItem('abs_user') : null;
@@ -231,6 +232,19 @@ export function DevicesPage() {
     }
   };
 
+  const handleBackupNow = async (device: Device) => {
+    setBackingUpId(device.id);
+    try {
+      await apiPost(`/jobs/run/manual/${device.id}`, {});
+      toast.success(`Backup queued for ${device.hostname}. Check Backup Schedule → Job History for progress.`);
+    } catch (err: unknown) {
+      const msg = (err && typeof err === 'object' && 'message' in err) ? (err as { message?: string }).message : String(err);
+      toast.error('Failed to queue backup: ' + (msg || 'Unknown error'));
+    } finally {
+      setBackingUpId(null);
+    }
+  };
+
   const handleTestConnection = async (deviceId?: number | string) => {
     setIsTestDialogOpen(true);
     setTestResult(null);
@@ -386,6 +400,19 @@ export function DevicesPage() {
                         <div className="flex gap-2">
                           {userRole === 'admin' ? (
                             <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleBackupNow(device)}
+                                title="Backup Now"
+                                disabled={backingUpId === device.id}
+                              >
+                                {backingUpId === device.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <UploadCloud className="w-4 h-4 text-blue-600" />
+                                )}
+                              </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
