@@ -98,6 +98,14 @@ export function DevicesPage() {
     device.ip.includes(searchQuery)
   );
 
+  // Visually separate Factory-site devices from the rest, based on the
+  // existing "Tags" field (tag "factory", case-insensitive) - no new field,
+  // reuses the tag system already used for schedule targeting.
+  const isFactoryTagged = (device: Device) =>
+    (device.tags ?? '').split(',').some(t => t.trim().toLowerCase() === 'factory');
+  const factoryDevices = filteredDevices.filter(isFactoryTagged);
+  const pusatDevices = filteredDevices.filter(d => !isFactoryTagged(d));
+
   const handleAddDevice = () => {
     setEditingDevice(null);
     setFormData({
@@ -278,6 +286,121 @@ export function DevicesPage() {
     fetchDevices();
   }, []);
 
+  const renderDeviceRow = (device: Device) => {
+    const isEnabled = device.enabled !== false;
+    return (
+      <TableRow key={device.id}>
+        <TableCell>
+          <div className="font-medium">{device.hostname}</div>
+          <div className="text-xs text-muted-foreground">{device.ip}</div>
+        </TableCell>
+        <TableCell>{device.vendor}</TableCell>
+        <TableCell>{device.protocol}</TableCell>
+        <TableCell>{device.port}</TableCell>
+        <TableCell>
+          {userRole === 'admin' ? (
+            <div className="flex items-center gap-2 font-mono text-sm">
+              {revealingId === device.id ? (
+                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+              ) : (
+                <span>{revealedId === device.id ? revealedPassword : '••••••••'}</span>
+              )}
+              <EyeToggleButton
+                visible={revealedId === device.id}
+                onClick={() => handleTogglePasswordReveal(device)}
+              />
+            </div>
+          ) : (
+            <span className="font-mono text-sm text-muted-foreground">****</span>
+          )}
+        </TableCell>
+        <TableCell>
+          <div className="flex items-center gap-2">
+            {userRole === 'admin' ? (
+              <Switch
+                checked={isEnabled}
+                onCheckedChange={() => handleToggleEnabled(device)}
+                className="data-[state=checked]:bg-green-600"
+                disabled={togglingId === device.id}
+              />
+            ) : null}
+            <Badge className={isEnabled ? 'bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-950 dark:text-green-300 dark:hover:bg-green-950' : 'bg-gray-100 text-gray-700 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-800'}>
+              {isEnabled ? 'Enabled' : 'Disabled'}
+            </Badge>
+          </div>
+        </TableCell>
+        <TableCell>
+          {device.last_backup
+            ? new Date(device.last_backup).toLocaleString('id-ID', {
+              day: 'numeric', month: 'short', year: 'numeric',
+              hour: '2-digit', minute: '2-digit'
+            })
+            : '-'
+          }
+        </TableCell>
+        <TableCell>
+          <div className="flex gap-2">
+            {userRole === 'admin' ? (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleBackupNow(device)}
+                  title="Backup Now"
+                  disabled={backingUpId === device.id}
+                >
+                  {backingUpId === device.id ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <UploadCloud className="w-4 h-4 text-blue-600" />
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    handleEditDevice(device);
+                    setTimeout(() => handleTestConnection(device.id), 100);
+                  }}
+                  title="Test Connection"
+                  disabled={testingConnection || loading}
+                >
+                  <TestTube className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleEditDevice(device)}
+                  title="Edit"
+                  disabled={loading}
+                >
+                  <Edit className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDeleteDevice(String(device.id))}
+                  title="Delete"
+                  disabled={deletingId === String(device.id)}
+                >
+                  {deletingId === String(device.id) ? (
+                    <div className="w-4 h-4 border-2 border-red-200 border-t-red-600 rounded-full animate-spin"></div>
+                  ) : (
+                    <Trash2 className="w-4 h-4 text-red-600" />
+                  )}
+                </Button>
+              </>
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => handleTestConnection(device.id)} title="Test Connection" disabled={testingConnection}>
+                <TestTube className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+        </TableCell>
+      </TableRow>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -313,156 +436,77 @@ export function DevicesPage() {
         </div>
       )}
 
-      {/* Devices Table */}
-      <div className="border rounded-lg bg-card overflow-hidden">
-        {loading && devices.length === 0 ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-              <p className="text-muted-foreground">Loading devices...</p>
+      {/* Devices Tables */}
+      {loading && devices.length === 0 ? (
+        <div className="border rounded-lg bg-card flex items-center justify-center py-12">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+            <p className="text-muted-foreground">Loading devices...</p>
+          </div>
+        </div>
+      ) : filteredDevices.length === 0 ? (
+        <div className="border rounded-lg bg-card flex items-center justify-center py-12">
+          <p className="text-muted-foreground">
+            {searchQuery ? 'No devices match your search.' : 'No devices found. Add a device to get started.'}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-foreground">🏢 Pusat</h3>
+            <div className="border rounded-lg bg-card overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Hostname</TableHead>
+                    <TableHead>Vendor</TableHead>
+                    <TableHead>Protocol</TableHead>
+                    <TableHead>Port</TableHead>
+                    <TableHead>Password</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Last Backup</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pusatDevices.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">No devices in this group.</TableCell>
+                    </TableRow>
+                  ) : (
+                    pusatDevices.map(renderDeviceRow)
+                  )}
+                </TableBody>
+              </Table>
             </div>
           </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Hostname</TableHead>
-                <TableHead>Vendor</TableHead>
-                <TableHead>Protocol</TableHead>
-                <TableHead>Port</TableHead>
-                <TableHead>Password</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Last Backup</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredDevices.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    {searchQuery ? 'No devices match your search.' : 'No devices found. Add a device to get started.'}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredDevices.map((device) => {
-                  const isEnabled = device.enabled !== false;
-                  return (
-                    <TableRow key={device.id}>
-                      <TableCell>
-                        <div className="font-medium">{device.hostname}</div>
-                        <div className="text-xs text-muted-foreground">{device.ip}</div>
-                      </TableCell>
-                      <TableCell>{device.vendor}</TableCell>
-                      <TableCell>{device.protocol}</TableCell>
-                      <TableCell>{device.port}</TableCell>
-                      <TableCell>
-                        {userRole === 'admin' ? (
-                          <div className="flex items-center gap-2 font-mono text-sm">
-                            {revealingId === device.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                            ) : (
-                              <span>{revealedId === device.id ? revealedPassword : '••••••••'}</span>
-                            )}
-                            <EyeToggleButton
-                              visible={revealedId === device.id}
-                              onClick={() => handleTogglePasswordReveal(device)}
-                            />
-                          </div>
-                        ) : (
-                          <span className="font-mono text-sm text-muted-foreground">****</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {userRole === 'admin' ? (
-                            <Switch
-                              checked={isEnabled}
-                              onCheckedChange={() => handleToggleEnabled(device)}
-                              className="data-[state=checked]:bg-green-600"
-                              disabled={togglingId === device.id}
-                            />
-                          ) : null}
-                          <Badge className={isEnabled ? 'bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-950 dark:text-green-300 dark:hover:bg-green-950' : 'bg-gray-100 text-gray-700 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-800'}>
-                            {isEnabled ? 'Enabled' : 'Disabled'}
-                          </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {device.last_backup
-                          ? new Date(device.last_backup).toLocaleString('id-ID', {
-                            day: 'numeric', month: 'short', year: 'numeric',
-                            hour: '2-digit', minute: '2-digit'
-                          })
-                          : '-'
-                        }
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          {userRole === 'admin' ? (
-                            <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleBackupNow(device)}
-                                title="Backup Now"
-                                disabled={backingUpId === device.id}
-                              >
-                                {backingUpId === device.id ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <UploadCloud className="w-4 h-4 text-blue-600" />
-                                )}
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  handleEditDevice(device);
-                                  setTimeout(() => handleTestConnection(device.id), 100);
-                                }}
-                                title="Test Connection"
-                                disabled={testingConnection || loading}
-                              >
-                                <TestTube className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleEditDevice(device)}
-                                title="Edit"
-                                disabled={loading}
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDeleteDevice(String(device.id))}
-                                title="Delete"
-                                disabled={deletingId === String(device.id)}
-                              >
-                                {deletingId === String(device.id) ? (
-                                  <div className="w-4 h-4 border-2 border-red-200 border-t-red-600 rounded-full animate-spin"></div>
-                                ) : (
-                                  <Trash2 className="w-4 h-4 text-red-600" />
-                                )}
-                              </Button>
-                            </>
-                          ) : (
-                            <Button variant="outline" size="sm" onClick={() => handleTestConnection(device.id)} title="Test Connection" disabled={testingConnection}>
-                              <TestTube className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
+
+          {factoryDevices.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-foreground">🏭 Factory</h3>
+              <div className="border rounded-lg bg-card overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Hostname</TableHead>
+                      <TableHead>Vendor</TableHead>
+                      <TableHead>Protocol</TableHead>
+                      <TableHead>Port</TableHead>
+                      <TableHead>Password</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Last Backup</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        )}
-      </div>
+                  </TableHeader>
+                  <TableBody>
+                    {factoryDevices.map(renderDeviceRow)}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Add/Edit Device Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

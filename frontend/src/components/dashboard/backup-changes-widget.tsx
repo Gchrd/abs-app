@@ -40,7 +40,7 @@ export function BackupChangesWidget() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <RefreshCw className="w-4 h-4 text-orange-500 dark:text-orange-400" />
-            <h3 className="text-foreground font-semibold">Backup Changes</h3>
+            <h3 className="text-foreground font-semibold">Configuration Changes</h3>
           </div>
           {changed.length > 0 && (
             <Badge className="bg-orange-100 text-orange-700 border border-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-800">
