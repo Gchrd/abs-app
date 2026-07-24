@@ -34,9 +34,10 @@ export function DevicesPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [testingConnection, setTestingConnection] = useState(false);
   const [togglingId, setTogglingId] = useState<string | number | null>(null);
-  const [revealedId, setRevealedId] = useState<string | number | null>(null);
-  const [revealedPassword, setRevealedPassword] = useState<string | null>(null);
-  const [revealingId, setRevealingId] = useState<string | number | null>(null);
+  const [revealedCreds, setRevealedCreds] = useState<{ id: string | number; username: string; password: string } | null>(null);
+  const [usernameVisibleId, setUsernameVisibleId] = useState<string | number | null>(null);
+  const [passwordVisibleId, setPasswordVisibleId] = useState<string | number | null>(null);
+  const [credsLoadingId, setCredsLoadingId] = useState<string | number | null>(null);
   const [backingUpId, setBackingUpId] = useState<string | number | null>(null);
   const [userRole] = useState<'admin' | 'viewer' | null>(() => {
     try {
@@ -221,23 +222,36 @@ export function DevicesPage() {
     }
   };
 
-  const handleTogglePasswordReveal = async (device: Device) => {
-    if (revealedId === device.id) {
-      setRevealedId(null);
-      setRevealedPassword(null);
-      return;
-    }
-    setRevealingId(device.id);
+  const ensureCredsLoaded = async (device: Device): Promise<boolean> => {
+    if (revealedCreds?.id === device.id) return true;
+    setCredsLoadingId(device.id);
     try {
-      const res = await apiGet<{ password: string }>(`/devices/${device.id}/credentials`);
-      setRevealedId(device.id);
-      setRevealedPassword(res.password);
+      const res = await apiGet<{ username: string; password: string }>(`/devices/${device.id}/credentials`);
+      setRevealedCreds({ id: device.id, username: res.username, password: res.password });
+      return true;
     } catch (err: unknown) {
       const msg = (err && typeof err === 'object' && 'message' in err) ? (err as { message?: string }).message : String(err);
-      toast.error('Failed to reveal password: ' + (msg || 'Unknown error'));
+      toast.error('Failed to reveal credentials: ' + (msg || 'Unknown error'));
+      return false;
     } finally {
-      setRevealingId(null);
+      setCredsLoadingId(null);
     }
+  };
+
+  const handleToggleUsernameReveal = async (device: Device) => {
+    if (usernameVisibleId === device.id) {
+      setUsernameVisibleId(null);
+      return;
+    }
+    if (await ensureCredsLoaded(device)) setUsernameVisibleId(device.id);
+  };
+
+  const handleTogglePasswordReveal = async (device: Device) => {
+    if (passwordVisibleId === device.id) {
+      setPasswordVisibleId(null);
+      return;
+    }
+    if (await ensureCredsLoaded(device)) setPasswordVisibleId(device.id);
   };
 
   const handleBackupNow = async (device: Device) => {
@@ -300,13 +314,30 @@ export function DevicesPage() {
         <TableCell>
           {userRole === 'admin' ? (
             <div className="flex items-center gap-2 font-mono text-sm">
-              {revealingId === device.id ? (
+              {credsLoadingId === device.id ? (
                 <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
               ) : (
-                <span>{revealedId === device.id ? revealedPassword : '••••••••'}</span>
+                <span>{usernameVisibleId === device.id ? revealedCreds?.username : '••••••••'}</span>
               )}
               <EyeToggleButton
-                visible={revealedId === device.id}
+                visible={usernameVisibleId === device.id}
+                onClick={() => handleToggleUsernameReveal(device)}
+              />
+            </div>
+          ) : (
+            <span className="font-mono text-sm text-muted-foreground">****</span>
+          )}
+        </TableCell>
+        <TableCell>
+          {userRole === 'admin' ? (
+            <div className="flex items-center gap-2 font-mono text-sm">
+              {credsLoadingId === device.id ? (
+                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+              ) : (
+                <span>{passwordVisibleId === device.id ? revealedCreds?.password : '••••••••'}</span>
+              )}
+              <EyeToggleButton
+                visible={passwordVisibleId === device.id}
                 onClick={() => handleTogglePasswordReveal(device)}
               />
             </div>
@@ -462,6 +493,7 @@ export function DevicesPage() {
                     <TableHead>Vendor</TableHead>
                     <TableHead>Protocol</TableHead>
                     <TableHead>Port</TableHead>
+                    <TableHead>Username</TableHead>
                     <TableHead>Password</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Last Backup</TableHead>
@@ -471,7 +503,7 @@ export function DevicesPage() {
                 <TableBody>
                   {hqDevices.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">No devices in this group.</TableCell>
+                      <TableCell colSpan={9} className="text-center py-6 text-muted-foreground">No devices in this group.</TableCell>
                     </TableRow>
                   ) : (
                     hqDevices.map(renderDeviceRow)
@@ -492,7 +524,8 @@ export function DevicesPage() {
                       <TableHead>Vendor</TableHead>
                       <TableHead>Protocol</TableHead>
                       <TableHead>Port</TableHead>
-                      <TableHead>Password</TableHead>
+                      <TableHead>Username</TableHead>
+                    <TableHead>Password</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Last Backup</TableHead>
                       <TableHead>Actions</TableHead>

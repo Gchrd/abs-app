@@ -101,9 +101,10 @@ def get_device_credentials(device_id: int, db: Session = Depends(get_db), curren
     d = db.get(Device, device_id)
     if not d:
         raise HTTPException(404, "Not found")
+    username = dec(d.username_enc)
     password = dec(d.password_enc)
-    audit_event(user=current_user.username, action="device_view_password", target=d.hostname, result="success")
-    return {"password": password}
+    audit_event(user=current_user.username, action="device_view_credentials", target=d.hostname, result="success")
+    return {"username": username, "password": password}
 
 
 @router.post("/{device_id}/test", response_model=TestResult)
