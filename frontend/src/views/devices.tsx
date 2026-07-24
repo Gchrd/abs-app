@@ -104,7 +104,7 @@ export function DevicesPage() {
   const isFactoryTagged = (device: Device) =>
     (device.tags ?? '').split(',').some(t => t.trim().toLowerCase() === 'factory');
   const factoryDevices = filteredDevices.filter(isFactoryTagged);
-  const pusatDevices = filteredDevices.filter(d => !isFactoryTagged(d));
+  const hqDevices = filteredDevices.filter(d => !isFactoryTagged(d));
 
   const handleAddDevice = () => {
     setEditingDevice(null);
@@ -453,7 +453,7 @@ export function DevicesPage() {
       ) : (
         <div className="space-y-6">
           <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-foreground">🏢 Pusat</h3>
+            <h3 className="text-sm font-semibold text-foreground">🏢 Headquarters</h3>
             <div className="border rounded-lg bg-card overflow-hidden">
               <Table>
                 <TableHeader>
@@ -469,12 +469,12 @@ export function DevicesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pusatDevices.length === 0 ? (
+                  {hqDevices.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">No devices in this group.</TableCell>
                     </TableRow>
                   ) : (
-                    pusatDevices.map(renderDeviceRow)
+                    hqDevices.map(renderDeviceRow)
                   )}
                 </TableBody>
               </Table>
