@@ -204,6 +204,7 @@ export function BackupsPage() {
   // Any device shown in the Active Backup table that's NOT in this set failed its
   // latest run - shown as a distinct "Backup Failed" status, not lumped in with "Unchanged".
   const [succeededDeviceIdsInLatestRun, setSucceededDeviceIdsInLatestRun] = useState<Set<number>>(new Set());
+  const [latestRunStatusLoading, setLatestRunStatusLoading] = useState(true);
 
   // Filters
   const [deviceFilter, setDeviceFilter] = useState('All');
@@ -280,6 +281,7 @@ export function BackupsPage() {
   }, []);
 
   const fetchLatestRunStatus = useCallback(async () => {
+    setLatestRunStatusLoading(true);
     try {
       const jobs = await apiGet<JobSummary[]>('/jobs');
       // jobs are most-recent-first; skip an in-progress run so devices not
@@ -302,6 +304,8 @@ export function BackupsPage() {
       setSucceededDeviceIdsInLatestRun(succeededDeviceIds);
     } catch {
       // silent - this only augments the Config Status badge, not critical path
+    } finally {
+      setLatestRunStatusLoading(false);
     }
   }, []);
 
@@ -705,7 +709,11 @@ export function BackupsPage() {
                       <code className="text-xs bg-muted px-2 py-1 rounded">{ab.hash.slice(0, 8)}</code>
                     </TableCell>
                     <TableCell>
-                      {ab.status_changed ? (
+                      {latestRunStatusLoading ? (
+                        <Badge variant="outline" className="text-muted-foreground gap-1">
+                          <Loader2 className="w-3 h-3 animate-spin" /> Checking...
+                        </Badge>
+                      ) : ab.status_changed ? (
                         <Badge className="bg-orange-100 text-orange-700 border border-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-800">
                           🔄 Changed
                         </Badge>
