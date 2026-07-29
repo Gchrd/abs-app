@@ -73,6 +73,10 @@ def sanitize_aruba(content: str) -> str:
         r"^Current system time:",
         # Aruba dynamically hashes passwords/keys in exports
         r"^\s*(?:admin-passwd|key|ap-console-password|bkup-passwords|wpa-passphrase) ",
+        # IPsec peer PSK is re-encrypted with a fresh salt/IV on every export -
+        # the underlying key doesn't change, but the ciphertext always does, e.g.:
+        # "    peer-ip-address 10.2.2.3 ipsec 2211d8470c1206c01cf971f554aaf205c2f3f40f1ee46f2e"
+        r"^\s*peer-ip-address\s+\S+\s+ipsec\s+",
     ]
     return sanitize_regex(content, patterns)
 
