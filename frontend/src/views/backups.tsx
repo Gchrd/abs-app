@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Eye, Download, Search, GitCompare, Star, Loader2, ChevronDown, ChevronRight, Trash2, FolderDown, History } from 'lucide-react';
+import { ConfirmDialog, type ConfirmDialogState } from '@/components/confirm-dialog';
 import { toast } from 'sonner';
 import { apiGet, apiGetBlob, apiGetText, apiPut, apiPost, downloadBackupBatch, deleteBackupBatch, downloadActiveBackups } from '@/lib/api';
 
@@ -226,6 +227,7 @@ export function BackupsPage() {
   const [diffTitle, setDiffTitle] = useState('');
   const [diffActiveBackup, setDiffActiveBackup] = useState<ActiveBackup | null>(null); // konteks diff yang sedang dibuka
   const [revertingId, setRevertingId] = useState<number | null>(null);
+  const [confirmState, setConfirmState] = useState<ConfirmDialogState | null>(null);
 
   // History Grouping & Batch Actions
   const [expandedBatches, setExpandedBatches] = useState<Record<string, boolean>>({});
@@ -380,11 +382,8 @@ export function BackupsPage() {
   };
 
   // Sets the LATEST backup (right panel) as active
-  const handleAcceptLatest = async () => {
+  const doAcceptLatest = async () => {
     if (!diffActiveBackup?.previous_backup_id) return;
-    if (!confirm(`Are you sure you want to use the latest configuration as the active reference for ${diffActiveBackup.device_name}?`)) {
-      return;
-    }
     setRevertingId(diffActiveBackup.previous_backup_id);
     try {
       await apiPut(`/backups/${diffActiveBackup.previous_backup_id}/set-active`, {});
@@ -400,12 +399,19 @@ export function BackupsPage() {
     }
   };
 
+  const handleAcceptLatest = () => {
+    if (!diffActiveBackup?.previous_backup_id) return;
+    setConfirmState({
+      title: 'Use Latest Configuration',
+      description: `Are you sure you want to use the latest configuration as the active reference for ${diffActiveBackup.device_name}?`,
+      confirmLabel: 'Use Latest',
+      onConfirm: doAcceptLatest,
+    });
+  };
+
   // Sets the CURRENT REFERENCE backup (left panel) as active explicitly, AND acknowledges the latest (right panel)
-  const handleKeepPrevious = async () => {
+  const doKeepPrevious = async () => {
     if (!diffActiveBackup?.backup_id) return;
-    if (!confirm(`Are you sure you want to keep the previous configuration for ${diffActiveBackup.device_name}? This will acknowledge the changes.`)) {
-      return;
-    }
     setRevertingId(diffActiveBackup.backup_id);
     try {
       // 1. Re-affirm the old backup as active
@@ -424,6 +430,16 @@ export function BackupsPage() {
     } finally {
       setRevertingId(null);
     }
+  };
+
+  const handleKeepPrevious = () => {
+    if (!diffActiveBackup?.backup_id) return;
+    setConfirmState({
+      title: 'Keep Previous Configuration',
+      description: `Are you sure you want to keep the previous configuration for ${diffActiveBackup.device_name}? This will acknowledge the changes.`,
+      confirmLabel: 'Keep Previous',
+      onConfirm: doKeepPrevious,
+    });
   };
 
   const handleViewDiff = async (active: ActiveBackup) => {
@@ -510,17 +526,7 @@ export function BackupsPage() {
     }
   };
 
-  const handleKeepPreviousAll = async () => {
-    const changedCount = activeBackups.filter(ab => ab.status_changed).length;
-    if (changedCount === 0) {
-      toast.info('No devices have changed configuration.');
-      return;
-    }
-    
-    if (!confirm(`Are you sure you want to keep the previous configuration for all ${changedCount} changed devices? This will acknowledge the changes.`)) {
-      return;
-    }
-
+  const doKeepPreviousAll = async () => {
     setBatchAcknowledgeLoading(true);
     try {
       const res = await apiPost<{}, { message: string, count: number }>('/backups/acknowledge-all', {});
@@ -534,17 +540,22 @@ export function BackupsPage() {
     }
   };
 
-  const handleAcceptLatestAll = async () => {
+  const handleKeepPreviousAll = () => {
     const changedCount = activeBackups.filter(ab => ab.status_changed).length;
     if (changedCount === 0) {
       toast.info('No devices have changed configuration.');
       return;
     }
 
-    if (!confirm(`Are you sure you want to use the latest configuration as the reference for all ${changedCount} changed devices?`)) {
-      return;
-    }
+    setConfirmState({
+      title: 'Keep Previous Configuration (All)',
+      description: `Are you sure you want to keep the previous configuration for all ${changedCount} changed devices? This will acknowledge the changes.`,
+      confirmLabel: 'Keep Previous',
+      onConfirm: doKeepPreviousAll,
+    });
+  };
 
+  const doAcceptLatestAll = async () => {
     setBatchAcceptLatestLoading(true);
     try {
       const res = await apiPost<{}, { message: string, count: number }>('/backups/accept-latest-all', {});
@@ -556,6 +567,21 @@ export function BackupsPage() {
     } finally {
       setBatchAcceptLatestLoading(false);
     }
+  };
+
+  const handleAcceptLatestAll = () => {
+    const changedCount = activeBackups.filter(ab => ab.status_changed).length;
+    if (changedCount === 0) {
+      toast.info('No devices have changed configuration.');
+      return;
+    }
+
+    setConfirmState({
+      title: 'Use Latest Configuration (All)',
+      description: `Are you sure you want to use the latest configuration as the reference for all ${changedCount} changed devices?`,
+      confirmLabel: 'Use Latest',
+      onConfirm: doAcceptLatestAll,
+    });
   };
 
   // Group filteredBackups into BatchGroups
@@ -1144,6 +1170,8 @@ export function BackupsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog state={confirmState} onOpenChange={(open) => !open && setConfirmState(null)} />
     </div>
   );
 }

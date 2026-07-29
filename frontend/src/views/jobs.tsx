@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Play, Eye, X } from 'lucide-react';
+import { ConfirmDialog, type ConfirmDialogState } from '@/components/confirm-dialog';
 import { toast } from 'sonner';
 import { apiGet, apiPost } from '@/lib/api';
 
@@ -45,6 +46,7 @@ export function JobsPage() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [jobLog, setJobLog] = useState<string[]>([]);
   const [loadingLog, setLoadingLog] = useState(false);
+  const [confirmState, setConfirmState] = useState<ConfirmDialogState | null>(null);
 
   const [userRole] = useState<'admin' | 'viewer'>(() => {
     try {
@@ -162,11 +164,7 @@ export function JobsPage() {
     }
   };
 
-  const handleCancelJob = async (jobId: number) => {
-    if (!confirm('Are you sure you want to cancel this job?')) {
-      return;
-    }
-
+  const doCancelJob = async (jobId: number) => {
     setCancellingId(jobId);
     try {
       await apiPost(`/jobs/${jobId}/cancel`, {});
@@ -179,6 +177,16 @@ export function JobsPage() {
     } finally {
       setCancellingId(null);
     }
+  };
+
+  const handleCancelJob = (jobId: number) => {
+    setConfirmState({
+      title: 'Cancel Job',
+      description: 'Are you sure you want to cancel this job?',
+      confirmLabel: 'Cancel Job',
+      destructive: true,
+      onConfirm: () => doCancelJob(jobId),
+    });
   };
 
   const handleRunManual = async () => {
@@ -391,6 +399,8 @@ export function JobsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog state={confirmState} onOpenChange={(open) => !open && setConfirmState(null)} />
     </div>
   );
 }

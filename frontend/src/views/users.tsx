@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2, Key } from 'lucide-react';
+import { ConfirmDialog, type ConfirmDialogState } from '@/components/confirm-dialog';
 import { toast } from 'sonner';
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api';
 
@@ -24,6 +25,7 @@ export function UsersPage() {
   const [savingUser, setSavingUser] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [resettingPassword, setResettingPassword] = useState(false);
+  const [confirmState, setConfirmState] = useState<ConfirmDialogState | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -67,18 +69,7 @@ export function UsersPage() {
     }
   };
 
-  const handleDeleteUser = async (user: User) => {
-    const adminCount = users.filter(u => u.role === 'admin').length;
-
-    if (user.role === 'admin' && adminCount <= 1) {
-      toast.error('Cannot delete the last admin user');
-      return;
-    }
-
-    if (!confirm(`Are you sure you want to delete user "${user.username}"?`)) {
-      return;
-    }
-
+  const doDeleteUser = async (user: User) => {
     setDeletingId(user.id);
     try {
       await apiDelete(`/users/${user.id}`);
@@ -90,6 +81,23 @@ export function UsersPage() {
     } finally {
       setDeletingId(null);
     }
+  };
+
+  const handleDeleteUser = (user: User) => {
+    const adminCount = users.filter(u => u.role === 'admin').length;
+
+    if (user.role === 'admin' && adminCount <= 1) {
+      toast.error('Cannot delete the last admin user');
+      return;
+    }
+
+    setConfirmState({
+      title: 'Delete User',
+      description: `Are you sure you want to delete user "${user.username}"?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => doDeleteUser(user),
+    });
   };
 
   const handleResetPassword = async () => {
@@ -363,6 +371,8 @@ export function UsersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog state={confirmState} onOpenChange={(open) => !open && setConfirmState(null)} />
     </div>
   );
 }

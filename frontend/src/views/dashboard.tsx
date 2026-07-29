@@ -54,6 +54,7 @@ export function DashboardPage() {
     failedBackups: 0,
     changedBackups: 0,
   });
+  const [statsLoading, setStatsLoading] = useState(true);
   const [recentJobs, setRecentJobs] = useState<Job[]>([]);
 
   useEffect(() => {
@@ -105,6 +106,8 @@ export function DashboardPage() {
         });
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
+      } finally {
+        setStatsLoading(false);
       }
     };
 
@@ -112,10 +115,10 @@ export function DashboardPage() {
   }, []);
 
   const kpiItems = [
-    { label: 'Total Devices', value: stats.totalDevices.toString(), icon: HardDrive, colorClass: 'text-blue-600 dark:text-blue-400' },
-    { label: 'Switches Backed Up (latest run)', value: stats.successfulBackups.toString(), icon: CheckCircle, colorClass: 'text-green-600 dark:text-green-400' },
-    { label: 'Switches Not Backed Up (latest run)', value: stats.failedBackups.toString(), icon: XCircle, colorClass: 'text-red-600 dark:text-red-400' },
-    { label: 'Configuration Changes', value: stats.changedBackups.toString(), icon: RefreshCw, colorClass: 'text-orange-600 dark:text-orange-400' },
+    { label: 'Total Devices', value: statsLoading ? '…' : stats.totalDevices.toString(), icon: HardDrive, colorClass: 'text-blue-600 dark:text-blue-400' },
+    { label: 'Switches Backed Up (latest run)', value: statsLoading ? '…' : stats.successfulBackups.toString(), icon: CheckCircle, colorClass: 'text-green-600 dark:text-green-400' },
+    { label: 'Switches Not Backed Up (latest run)', value: statsLoading ? '…' : stats.failedBackups.toString(), icon: XCircle, colorClass: 'text-red-600 dark:text-red-400' },
+    { label: 'Configuration Changes', value: statsLoading ? '…' : stats.changedBackups.toString(), icon: RefreshCw, colorClass: 'text-orange-600 dark:text-orange-400' },
   ];
 
   const getStatusBadge = (status: string) => {

@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Edit, Trash2, CheckCircle, XCircle } from 'lucide-react';
+import { ConfirmDialog, type ConfirmDialogState } from '@/components/confirm-dialog';
 import { toast } from 'sonner';
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api';
 
@@ -38,6 +39,7 @@ export function SchedulesPage() {
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [confirmState, setConfirmState] = useState<ConfirmDialogState | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
   const [formData, setFormData] = useState({
@@ -163,11 +165,7 @@ export function SchedulesPage() {
     }
   };
 
-  const handleDeleteSchedule = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this schedule?')) {
-      return;
-    }
-
+  const doDeleteSchedule = async (id: number) => {
     setDeletingId(id);
     try {
       await apiDelete(`/schedules/${id}`);
@@ -179,6 +177,16 @@ export function SchedulesPage() {
     } finally {
       setDeletingId(null);
     }
+  };
+
+  const handleDeleteSchedule = (id: number) => {
+    setConfirmState({
+      title: 'Delete Schedule',
+      description: 'Are you sure you want to delete this schedule?',
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => doDeleteSchedule(id),
+    });
   };
 
   const handleToggleEnabled = async (schedule: Schedule) => {
@@ -476,6 +484,8 @@ export function SchedulesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog state={confirmState} onOpenChange={(open) => !open && setConfirmState(null)} />
     </div>
   );
 }

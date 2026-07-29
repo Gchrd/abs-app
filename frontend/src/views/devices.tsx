@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Plus, Search, Trash2, Edit, TestTube, CheckCircle, XCircle, Loader2, UploadCloud } from 'lucide-react';
 import { EyeToggleButton } from '@/components/eye-toggle-button';
+import { ConfirmDialog, type ConfirmDialogState } from '@/components/confirm-dialog';
 import { toast } from 'sonner';
 
 interface Device {
@@ -39,6 +40,7 @@ export function DevicesPage() {
   const [passwordVisibleId, setPasswordVisibleId] = useState<string | number | null>(null);
   const [credsLoadingId, setCredsLoadingId] = useState<string | number | null>(null);
   const [backingUpId, setBackingUpId] = useState<string | number | null>(null);
+  const [confirmState, setConfirmState] = useState<ConfirmDialogState | null>(null);
   const [userRole] = useState<'admin' | 'viewer' | null>(() => {
     try {
       const u = typeof window !== 'undefined' ? localStorage.getItem('abs_user') : null;
@@ -175,11 +177,7 @@ export function DevicesPage() {
     }
   };
 
-  const handleDeleteDevice = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this device?')) {
-      return;
-    }
-
+  const doDeleteDevice = async (id: string) => {
     setDeletingId(id);
     try {
       await apiDelete(`/devices/${id}`);
@@ -191,6 +189,16 @@ export function DevicesPage() {
     } finally {
       setDeletingId(null);
     }
+  };
+
+  const handleDeleteDevice = (id: string) => {
+    setConfirmState({
+      title: 'Delete Device',
+      description: 'Are you sure you want to delete this device?',
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => doDeleteDevice(id),
+    });
   };
 
   const handleToggleEnabled = async (device: Device) => {
@@ -736,6 +744,8 @@ export function DevicesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog state={confirmState} onOpenChange={(open) => !open && setConfirmState(null)} />
     </div>
   );
 }

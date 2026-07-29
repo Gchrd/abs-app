@@ -122,13 +122,14 @@ def _connect_telnet_manual(
     secret: str | None,
     port: int,
     session_log: str,
+    connect_timeout: int = 30,
 ):
     """Telnet login manual using raw telnetlib - PROVEN WORKING!"""
     import telnetlib  # type: ignore  # deprecated but still works in Python 3.11
     import time
-    
+
     # Use telnetlib directly
-    tn = telnetlib.Telnet(host, port, timeout=30)
+    tn = telnetlib.Telnet(host, port, timeout=connect_timeout)
     time.sleep(1)
     
     # FLEXIBLE login prompt detection (Username, login, User Name, etc)
@@ -184,6 +185,7 @@ def _connect_ssh_normal(
     secret: str | None,
     port: int,
     session_log: str,
+    connect_timeout: int = 30,
 ):
     """SSH biasa pakai mapping vendor."""
     device_type = _device_type_ssh(vendor)
@@ -201,7 +203,7 @@ def _connect_ssh_normal(
         "disabled_algorithms": {
             "pubkeys": ["rsa-sha2-256", "rsa-sha2-512"],
         },
-        "conn_timeout": 30,
+        "conn_timeout": connect_timeout,
     }
 
     conn = ConnectHandler(**device)
@@ -241,6 +243,7 @@ def fetch_running_config(
     protocol: str,
     port: int,
     cmd: str | None = None,
+    tags: str | None = None,
 ) -> tuple[str, bytes]:
     """
     - Kalau protocol = 'Telnet'  -> pakai terminal_server + login manual
@@ -251,6 +254,12 @@ def fetch_running_config(
     import traceback
 
     session_log = os.path.join(tempfile.gettempdir(), f"netmiko_{host}.log")
+
+    # Factory-site devices tend to sit behind a slower/less reliable WAN link than
+    # HQ - give them more time to complete the initial connection before giving up,
+    # instead of just retrying the same too-short timeout repeatedly.
+    is_factory = bool(tags) and "factory" in tags.lower()
+    connect_timeout = 60 if is_factory else 30
 
     conn = None
     output = ""
@@ -270,6 +279,7 @@ def fetch_running_config(
                 secret=secret,
                 port=port,
                 session_log=session_log,
+                connect_timeout=connect_timeout,
             )
             
             # Send command to get config using telnetlib
@@ -320,6 +330,7 @@ def fetch_running_config(
                 secret=secret,
                 port=port,
                 session_log=session_log,
+                connect_timeout=connect_timeout,
             )
             
             enable_error = getattr(conn, "_abs_enable_error", "unknown") or "succeeded, no error"

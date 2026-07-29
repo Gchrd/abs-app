@@ -87,11 +87,12 @@ async def run_scheduled_backup(schedule_id: int, schedule_name: str):
                 'username': dec(d.username_enc),
                 'password': dec(d.password_enc),
                 'secret': dec(d.secret_enc) if d.secret_enc else None,
+                'tags': d.tags,
             })
-        
+
         ok = 0
-        max_attempts = 4
-        retry_delays = [15, 30, 60] # Delays in seconds for attempt 2, 3, and 4
+        max_attempts = 5
+        retry_delays = [15, 30, 60, 60] # Delays in seconds for attempt 2, 3, 4, and 5
 
         for idx, device_info in enumerate(device_list):
             for attempt in range(max_attempts):
@@ -100,15 +101,16 @@ async def run_scheduled_backup(schedule_id: int, schedule_name: str):
                         log_lines.append(f"[{device_info['hostname']}] Connecting to {device_info['ip']}...")
                     else:
                         log_lines.append(f"[{device_info['hostname']}] Retrying backup...")
-                        
+
                     path, content = fetch_running_config(
-                        vendor=device_info['vendor'], 
-                        host=device_info['ip'], 
+                        vendor=device_info['vendor'],
+                        host=device_info['ip'],
                         username=device_info['username'],
-                        password=device_info['password'], 
+                        password=device_info['password'],
                         secret=device_info['secret'],
-                        protocol=device_info['protocol'], 
-                        port=device_info['port']
+                        protocol=device_info['protocol'],
+                        port=device_info['port'],
+                        tags=device_info.get('tags')
                     )
 
                     # Sanitize content for hashing (ignore timestamps)

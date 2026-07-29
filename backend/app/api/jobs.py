@@ -34,6 +34,7 @@ def _device_to_dict(d: Device) -> dict:
         'username': dec(d.username_enc),
         'password': dec(d.password_enc),
         'secret': dec(d.secret_enc) if d.secret_enc else None,
+        'tags': d.tags,
     }
 
 
@@ -54,8 +55,8 @@ async def _run_backup_devices(job_id: int, device_list: list[dict], triggered_us
         log_lines.append(f"Job started at {job.started_at.isoformat()}")
         log_lines.append(f"Processing {len(device_list)} device(s)...")
 
-        max_attempts = 4
-        retry_delays = [15, 30, 60]
+        max_attempts = 5
+        retry_delays = [15, 30, 60, 60]
 
         for idx, device_info in enumerate(device_list):
             for attempt in range(max_attempts):
@@ -73,7 +74,8 @@ async def _run_backup_devices(job_id: int, device_list: list[dict], triggered_us
                         password=device_info['password'],
                         secret=device_info['secret'],
                         protocol=device_info['protocol'],
-                        port=device_info['port']
+                        port=device_info['port'],
+                        tags=device_info.get('tags')
                     )
 
                     # Sanitize content for hashing (ignore timestamps)

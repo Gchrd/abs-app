@@ -56,6 +56,11 @@ def sanitize_mikrotik_routeros(content: str) -> str:
         r"^# \w+/\d+/\d+ .* by RouterOS",
         # Example: # software id = XXXX-XXXX (can change after upgrade)
         r"^# software id =",
+        # RouterOS sometimes fails to export a section on a given run (transient
+        # export-command quirk, not an actual config change) and writes an error
+        # line straight into the output instead, e.g.:
+        # "#error exporting /ip dhcp-server option sets"
+        r"^#error exporting ",
     ]
     return sanitize_regex(content, patterns)
 
@@ -74,14 +79,14 @@ def sanitize_aruba(content: str) -> str:
 
 def sanitize_huawei(content: str) -> str:
     patterns = [
-        # Huawei timestamp headers
-        r"^#\s*$",  # standalone # lines (separators)
-        r"^ sysname ",  # can contain variable info in some configs
-        r"^  undo info-center loghost",  # dynamic logging entries
+        # Timestamp header rewritten on every export, e.g.:
+        # "!Last configuration was updated at 2026-05-11 02:26:21+00:00 by SYSTEM automatically"
+        r"^!Last configuration was updated at",
+        r"^!Software Version V",
+        r"^ Current configuration :",
+        r"^#\d{4}-",
     ]
-    # Only strip the pure timestamp header line
-    ts_pattern = [r"^!Software Version V", r"^ Current configuration :", r"^#\d{4}-"]
-    return sanitize_regex(content, ts_pattern)
+    return sanitize_regex(content, patterns)
 
 
 def sanitize_fortinet(content: str) -> str:
