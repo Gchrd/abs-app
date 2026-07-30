@@ -13,6 +13,27 @@ class NonRetryableBackupError(Exception):
     policy, breaking even manual troubleshooting logins right after."""
     pass
 
+
+class TelnetAuthError(Exception):
+    """Raised when the device itself rejected the username/password/enable
+    secret during the Telnet login sequence (e.g. '% Bad passwords'), as
+    opposed to a network/socket-level failure. Distinguished from generic
+    connection errors so the caller can surface a clear, actionable message
+    instead of the confusing downstream symptom (the device closes the
+    socket after rejecting the login, so the next write() raises a raw
+    'Broken pipe' if this isn't caught first)."""
+    pass
+
+
+_TELNET_AUTH_FAILURE_MARKERS = (
+    b"% Bad passwords",
+    b"% Bad secrets",
+    b"% Login invalid",
+    b"% Access denied",
+    b"Authentication failed",
+    b"Access denied",
+)
+
 # device_type hanya untuk SSH
 VENDOR_MAP = {
     "Cisco (IOS Router/Switch)": "cisco_ios",
@@ -131,22 +152,45 @@ def _connect_telnet_manual(
     # Use telnetlib directly
     tn = telnetlib.Telnet(host, port, timeout=connect_timeout)
     time.sleep(1)
-    
-    # FLEXIBLE login prompt detection (Username, login, User Name, etc)
-    index, match, text = tn.expect([
-        b"Username:", b"username:", b"User Name:", b"User:", 
-        b"Login:", b"login:", b"USER:"
-    ], timeout=15)
-    
-    # Send username
-    tn.write(username.encode('ascii') + b"\n")
-    time.sleep(1)
-    
-    # Wait for password prompt (flexible detection)
-    tn.expect([b"Password:", b"password:", b"PASS:"], timeout=15)
+
+    # FLEXIBLE login prompt detection. Some devices ask for a username first
+    # (Username:/Login:/etc), others are configured for line-password-only
+    # auth and go straight to "Password:" - watch for both in one expect()
+    # so we don't blindly write `username` into a Password prompt (which
+    # burns one of the device's limited login attempts on garbage and, once
+    # the device gives up and closes the socket, surfaces downstream as a
+    # confusing raw "Broken pipe" instead of a clear auth error).
+    username_prompts = [b"Username:", b"username:", b"User Name:", b"User:", b"Login:", b"login:", b"USER:"]
+    password_prompts = [b"Password:", b"password:", b"PASS:"]
+    index, match, text = tn.expect(username_prompts + password_prompts, timeout=15)
+
+    if index != -1 and index < len(username_prompts):
+        # Device asked for a username first - answer it, then wait for Password:.
+        tn.write(username.encode('ascii') + b"\n")
+        time.sleep(1)
+        tn.expect(password_prompts, timeout=15)
+    # else: either the device went straight to Password: (index in the
+    # password_prompts range) or neither prompt appeared within 15s (index
+    # == -1, e.g. a slow/unusual banner) - in both cases don't send the
+    # username, just proceed to answer whatever password prompt is current.
+
     tn.write(password.encode('ascii') + b"\n")
     time.sleep(2)
-    
+
+    post_password = tn.read_very_eager()
+    if any(marker in post_password for marker in _TELNET_AUTH_FAILURE_MARKERS) or (
+        b"Password:" in post_password or b"password:" in post_password
+    ):
+        # Either an explicit rejection message, or the device re-displayed
+        # the Password: prompt (i.e. asking again = the one we just sent
+        # was wrong). Bail out now with a clear message instead of
+        # continuing to write "enable"/commands into a session the device
+        # is about to close on its own.
+        tn.close()
+        raise TelnetAuthError(
+            f"Device rejected the username/password (response: {post_password.strip()[:200]!r})"
+        )
+
     # Always try to reach privileged/enable mode, even if no enable secret was
     # configured - some devices allow "enable" with a blank password. Previously
     # this was skipped entirely whenever `secret` was empty (same bug fixed on
@@ -339,8 +383,22 @@ def fetch_running_config(
             config_cmd = cmd or _get_config_command(vendor)
             output = conn.send_command(config_cmd, read_timeout=60)
 
+    except TelnetAuthError as e:
+        # The device itself rejected the login (not a network/socket issue) -
+        # surface that plainly instead of letting the next write() fail with
+        # a confusing raw socket error once the device hangs up. Non-retryable:
+        # retrying with the same wrong credentials will just fail again and
+        # risks tripping the device's own lockout policy.
+        raise NonRetryableBackupError(f"Authentication failed: {host} | {e}")
+
     except Exception as e:
         error_msg = str(e)
+        auth_exc_names = ("NetmikoAuthenticationException", "AuthenticationException")
+        if type(e).__name__ in auth_exc_names:
+            # Same idea on the SSH path: netmiko already raises a dedicated
+            # exception for rejected credentials - relabel it clearly instead
+            # of the generic "Connection failed" wrapper used for everything else.
+            raise NonRetryableBackupError(f"Authentication failed: {host} | {error_msg}")
         # Session log available at: session_log (for debugging if needed)
         raise Exception(f"Connection failed: {host} | Error: {error_msg}")
 
