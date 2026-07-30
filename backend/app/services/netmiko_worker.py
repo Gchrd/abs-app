@@ -34,6 +34,16 @@ _TELNET_AUTH_FAILURE_MARKERS = (
     b"Access denied",
 )
 
+
+def _redact(text: str, *secret_values: str | None) -> str:
+    """Scrub known credential values out of a string before it's put
+    somewhere less trusted than the connection code itself (job logs,
+    which viewer-role users can read via GET /jobs)."""
+    for value in secret_values:
+        if value:
+            text = text.replace(value, "***REDACTED***")
+    return text
+
 # device_type hanya untuk SSH
 VENDOR_MAP = {
     "Cisco (IOS Router/Switch)": "cisco_ios",
@@ -149,6 +159,20 @@ def _connect_telnet_manual(
     import telnetlib  # type: ignore  # deprecated but still works in Python 3.11
     import time
 
+    def _log(data: bytes):
+        # Unlike netmiko (SSH path), telnetlib has no built-in session_log -
+        # append the raw exchange ourselves so Telnet failures get the same
+        # diagnostic transcript tail (session_log_tail) that SSH failures do,
+        # instead of always showing "n/a (telnet path)". Credentials written
+        # here are scrubbed by _redact() wherever this file is later read.
+        if not data:
+            return
+        try:
+            with open(session_log, "ab") as f:
+                f.write(data)
+        except Exception:
+            pass
+
     # Use telnetlib directly
     tn = telnetlib.Telnet(host, port, timeout=connect_timeout)
     time.sleep(1)
@@ -163,12 +187,14 @@ def _connect_telnet_manual(
     username_prompts = [b"Username:", b"username:", b"User Name:", b"User:", b"Login:", b"login:", b"USER:"]
     password_prompts = [b"Password:", b"password:", b"PASS:"]
     index, match, text = tn.expect(username_prompts + password_prompts, timeout=15)
+    _log(text)
 
     if index != -1 and index < len(username_prompts):
         # Device asked for a username first - answer it, then wait for Password:.
         tn.write(username.encode('ascii') + b"\n")
         time.sleep(1)
-        tn.expect(password_prompts, timeout=15)
+        idx2, m2, text2 = tn.expect(password_prompts, timeout=15)
+        _log(text2)
     # else: either the device went straight to Password: (index in the
     # password_prompts range) or neither prompt appeared within 15s (index
     # == -1, e.g. a slow/unusual banner) - in both cases don't send the
@@ -178,6 +204,7 @@ def _connect_telnet_manual(
     time.sleep(2)
 
     post_password = tn.read_very_eager()
+    _log(post_password)
     if any(marker in post_password for marker in _TELNET_AUTH_FAILURE_MARKERS) or (
         b"Password:" in post_password or b"password:" in post_password
     ):
@@ -199,7 +226,8 @@ def _connect_telnet_manual(
     # detected" instead of a clear permission error.
     tn.write(b"enable\n")
     time.sleep(1)
-    idx, _, _ = tn.expect([b"Password:", b"password:"], timeout=5)
+    idx, _, enable_prompt_text = tn.expect([b"Password:", b"password:"], timeout=5)
+    _log(enable_prompt_text)
     if idx != -1:
         # Device asked for an enable password - send whatever we have
         # (blank if none configured; some devices accept that too).
@@ -207,16 +235,16 @@ def _connect_telnet_manual(
         time.sleep(2)
     # else: no password prompt within 5s - device went straight to privileged
     # mode (blank-enable or already-privileged login), nothing more to send.
-    
+
     # Disable paging (try multiple times for reliability)
     tn.write(b"terminal length 0\n")
     time.sleep(1)
-    tn.read_very_eager()  # Clear buffer
-    
+    _log(tn.read_very_eager())  # Clear buffer
+
     # Double-send for stubborn devices
     tn.write(b"terminal length 0\n")
     time.sleep(0.5)
-    tn.read_very_eager()
+    _log(tn.read_very_eager())
     
     return tn
 
@@ -334,7 +362,7 @@ def fetch_running_config(
             
             # Read ALL output using robust method (handles large configs)
             raw_output = _read_all(tn, timeout=3)
-            
+
             # Handle --More-- prompts if paging not fully disabled
             while b"--More--" in raw_output or b"-- More --" in raw_output:
                 tn.write(b" ")
@@ -343,7 +371,17 @@ def fetch_running_config(
                 raw_output += additional
                 if not additional:
                     break
-            
+
+            # Append the command's raw reply to the same transcript file the
+            # login sequence was logged to, so a CLI-error failure on the
+            # Telnet path gets a populated session_log_tail too (previously
+            # only the SSH path did, via netmiko's built-in session_log).
+            try:
+                with open(session_log, "ab") as _f:
+                    _f.write(raw_output)
+            except Exception:
+                pass
+
             # Decode output
             output = raw_output.decode('ascii', errors='ignore')
             
@@ -389,10 +427,10 @@ def fetch_running_config(
         # a confusing raw socket error once the device hangs up. Non-retryable:
         # retrying with the same wrong credentials will just fail again and
         # risks tripping the device's own lockout policy.
-        raise NonRetryableBackupError(f"Authentication failed: {host} | {e}")
+        raise NonRetryableBackupError(f"Authentication failed: {host} | {_redact(str(e), password, secret)}")
 
     except Exception as e:
-        error_msg = str(e)
+        error_msg = _redact(str(e), password, secret)
         auth_exc_names = ("NetmikoAuthenticationException", "AuthenticationException")
         if type(e).__name__ in auth_exc_names:
             # Same idea on the SSH path: netmiko already raises a dedicated
@@ -410,6 +448,12 @@ def fetch_running_config(
             if os.path.exists(session_log):
                 with open(session_log, "rb") as f:
                     session_log_tail = f.read().decode("utf-8", errors="ignore")[-800:]
+                # The raw transcript includes whatever was typed into the
+                # channel, including the enable secret and login password -
+                # this tail ends up in job.log, which viewer-role users can
+                # read via GET /jobs. Scrub known secret values before they
+                # ever leave this function.
+                session_log_tail = _redact(session_log_tail, password, secret)
         except Exception:
             pass
 
@@ -447,13 +491,29 @@ def fetch_running_config(
     if len(output.strip()) < 10:
         raise Exception("Backup failure: Output is empty or suspiciously short (less than 10 chars). The device might be busy, slow to respond, or the prompt was not detected correctly.")
 
+    if "#error exporting" in output:
+        # RouterOS failed to export one or more config sections on this run
+        # (a transient export-command quirk, not an actual config change).
+        # The sanitizer used to just strip this marker out before hashing,
+        # which meant an incomplete backup got saved and counted as a normal
+        # success. Raise a plain (retryable) error instead - a later attempt
+        # may succeed cleanly, and this way a persistently incomplete export
+        # actually shows up as a failed job instead of silently going unnoticed.
+        raise Exception(
+            f"Backup failure: Device reported an incomplete config export "
+            f"('#error exporting' found in output) - one or more sections "
+            f"failed to export. Raw reply snippet: {output.strip()[:200]!r}"
+        )
+
     if _looks_like_cli_error(output):
         transcript_note = f" | Session transcript tail: {session_log_tail!r}" if session_log_tail else ""
+        safe_output = _redact(output.strip()[:200], password, secret)
+        safe_enable_error = _redact(str(enable_error), password, secret)
         raise NonRetryableBackupError(
             f"Backup failure: Device returned a command error instead of configuration "
             f"(command '{cmd or _get_config_command(vendor)}' may be wrong for this device's "
             f"vendor/firmware, or the session wasn't in the right privilege level). "
-            f"Raw reply: {output.strip()[:200]!r} | enable() result: {enable_error!r}{transcript_note}"
+            f"Raw reply: {safe_output!r} | enable() result: {safe_enable_error!r}{transcript_note}"
         )
 
     # Simpan ke file

@@ -160,7 +160,7 @@ export function DevicesPage() {
       username: '',
       password: '',
       secret: '',
-      tags: '',
+      tags: device.tags || '',
     });
     setIsDialogOpen(true);
   };
@@ -706,7 +706,7 @@ export function DevicesPage() {
                 type="password"
                 value={formData.secret}
                 onChange={(e) => setFormData({ ...formData, secret: e.target.value })}
-                placeholder="Optional enable secret"
+                placeholder={editingDevice ? 'Leave empty to keep current' : 'Optional enable secret'}
               />
             </div>
 

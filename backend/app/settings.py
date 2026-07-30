@@ -1,7 +1,10 @@
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    SECRET_KEY: str = "2502011285-josephcristianlubis"
+    # No real default on purpose - this signs JWTs and derives the key that
+    # encrypts stored device credentials, so it must come from backend/.env
+    # (an untracked file), never be hardcoded/committed here.
+    SECRET_KEY: str = "insecure-default-set-a-real-SECRET_KEY-in-backend/.env"
     ALGORITHM: str = "HS256"
     # Default access token expiry: 8 hours
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 8

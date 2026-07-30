@@ -44,7 +44,8 @@ def update_device(device_id: int, payload: DeviceIn, db: Session = Depends(get_d
         d.username_enc = enc(payload.username)
     if payload.password:
         d.password_enc = enc(payload.password)
-    d.secret_enc = enc(payload.secret) if payload.secret else None
+    if payload.secret:
+        d.secret_enc = enc(payload.secret)
     d.tags = payload.tags
     if payload.enabled is not None:
         d.enabled = payload.enabled

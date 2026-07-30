@@ -23,7 +23,7 @@ def sanitize_regex(content: str, patterns: list[str]) -> str:
     """
     lines = content.splitlines()
     cleaned_lines = []
-    
+
     compiled_patterns = [re.compile(p) for p in patterns]
 
     for line in lines:
@@ -32,11 +32,34 @@ def sanitize_regex(content: str, patterns: list[str]) -> str:
             if pattern.search(line):
                 should_ignore = True
                 break
-        
+
         if not should_ignore:
             cleaned_lines.append(line)
-            
+
     return '\n'.join(cleaned_lines)
+
+
+def sanitize_redact(content: str, rules: list[tuple[str, str]]) -> str:
+    """
+    Like sanitize_regex, but instead of deleting a whole matching line,
+    substitutes just the volatile part of it (e.g. a resalted ciphertext)
+    with a fixed placeholder, via regex substitution. Dropping the whole
+    line made an added/removed entry (a real config change) invisible to
+    the hash, same as a value that's merely resalted on every export -
+    keeping the line's structure means an added/removed entry still shows
+    up, even though a same-slot value swap still can't be told apart from
+    a resalt (that would require decrypting the vendor's ciphertext).
+    """
+    compiled = [(re.compile(p), r) for p, r in rules]
+    out = []
+    for line in content.splitlines():
+        new_line = line
+        for pattern, repl in compiled:
+            if pattern.match(line):
+                new_line = pattern.sub(repl, line)
+                break
+        out.append(new_line)
+    return '\n'.join(out)
 
 
 def sanitize_cisco_ios(content: str) -> str:
@@ -71,14 +94,21 @@ def sanitize_aruba(content: str) -> str:
         r"^; Generated on ",
         r"^; Current System Time:",
         r"^Current system time:",
-        # Aruba dynamically hashes passwords/keys in exports
-        r"^\s*(?:admin-passwd|key|ap-console-password|bkup-passwords|wpa-passphrase) ",
-        # IPsec peer PSK is re-encrypted with a fresh salt/IV on every export -
-        # the underlying key doesn't change, but the ciphertext always does, e.g.:
-        # "    peer-ip-address 10.2.2.3 ipsec 2211d8470c1206c01cf971f554aaf205c2f3f40f1ee46f2e"
-        r"^\s*peer-ip-address\s+\S+\s+ipsec\s+",
     ]
-    return sanitize_regex(content, patterns)
+    content = sanitize_regex(content, patterns)
+
+    # Aruba re-encrypts passwords/keys with a fresh salt on every export even
+    # when the underlying value is unchanged. Dropping these lines entirely
+    # (previous behavior) also hid a genuine password/key ROTATION, since the
+    # line just vanished from both old and new configs either way. Redacting
+    # only the value keeps the line itself in the diff, so an added/removed
+    # entry still changes the hash - a same-slot value change still can't be
+    # distinguished from a resalt without decrypting Aruba's ciphertext.
+    redact_rules = [
+        (r"^(\s*(?:admin-passwd|key|ap-console-password|bkup-passwords|wpa-passphrase)\s+)\S+", r"\1<redacted-in-abs>"),
+        (r"^(\s*peer-ip-address\s+\S+\s+ipsec\s+)\S+", r"\1<redacted-in-abs>"),
+    ]
+    return sanitize_redact(content, redact_rules)
 
 
 def sanitize_huawei(content: str) -> str:
@@ -97,12 +127,22 @@ def sanitize_fortinet(content: str) -> str:
     patterns = [
         # Fortinet config version line which changes every export
         r"^#conf_file_ver=",
-        # Fortinet encrypts passwords with dynamic salts that change every export
-        r"^\s*set (?:password|secret|psksecret|private-key|auth-password) ENC ",
-        # Catch any other generic ENC fields just in case
-        r"^\s*set .* ENC "
     ]
-    return sanitize_regex(content, patterns)
+    content = sanitize_regex(content, patterns)
+
+    # Fortinet re-encrypts ENC fields with a fresh salt on every export even
+    # when the value is unchanged. Dropping these lines entirely (previous
+    # behavior) also hid a genuine password/secret/PSK ROTATION, since the
+    # line vanished from both old and new configs either way. Redacting only
+    # the value keeps the line itself in the diff, so an added/removed entry
+    # still changes the hash - a same-slot value change still can't be told
+    # apart from a resalt without decrypting Fortinet's ciphertext.
+    redact_rules = [
+        (r"^(\s*set (?:password|secret|psksecret|private-key|auth-password) ENC\s+)\S+", r"\1<redacted-in-abs>"),
+        # Catch any other generic ENC fields just in case
+        (r"^(\s*set \S+ ENC\s+)\S+", r"\1<redacted-in-abs>"),
+    ]
+    return sanitize_redact(content, redact_rules)
 
 
 def sanitize_config(content: str, vendor: str = 'cisco_ios') -> str:
