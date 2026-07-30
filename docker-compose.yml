@@ -36,6 +36,12 @@ services:
       - "2309:3000"
     environment:
       - NEXT_PUBLIC_API_BASE=/api
+      # Docker auto-sets HOSTNAME to the container ID, and the Next.js
+      # standalone server.js binds to `process.env.HOSTNAME || '0.0.0.0'` -
+      # so without this override it only listens on the container's bridge
+      # IP, never on 127.0.0.1/localhost (external access via the published
+      # port still worked, but the healthcheck hitting 127.0.0.1 never could).
+      - HOSTNAME=0.0.0.0
     depends_on:
       - backend
     networks:
