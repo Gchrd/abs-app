@@ -32,9 +32,11 @@ COPY --from=builder /app/public ./public
 # Expose port
 EXPOSE 3000
 
-# Health check
+# Health check (127.0.0.1, not localhost - the server only listens on
+# IPv4 and this image's DNS resolution can prefer the ::1 IPv6 loopback,
+# which then fails with "Connection refused" even though the app is up)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000 || exit 1
 
 # Run the standalone server
 CMD ["node", "server.js"]
