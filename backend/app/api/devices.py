@@ -115,14 +115,34 @@ def test_device(device_id: int, db: Session = Depends(get_db), current_user=Depe
         decrypted_user = dec(d.username_enc)
         decrypted_pass = dec(d.password_enc)
         decrypted_secret = dec(d.secret_enc) if d.secret_enc else None
-        
-        fetch_running_config(
+
+        _, content = fetch_running_config(
             vendor=d.vendor, host=d.ip, username=decrypted_user,
             password=decrypted_pass, secret=decrypted_secret,
             protocol=d.protocol, port=d.port, cmd="show version"
         )
         audit_event(user=current_user.username, action="device_test", target=d.hostname, result="success")
-        return TestResult(success=True, message="OK")
+        snippet = content[:300].decode(errors="ignore")
+        return TestResult(success=True, message="OK", output_snippet=snippet)
     except Exception as e:
         audit_event(user=current_user.username, action="device_test", target=d.hostname, result=f"failed: {str(e)}")
+        return TestResult(success=False, message=f"Failed: {e}")
+
+
+@router.post("/test-connection", response_model=TestResult)
+def test_connection_precreate(payload: DeviceIn, current_user=Depends(require_admin)):
+    """Test a device's credentials/reachability before it's saved - same underlying
+    check as /{device_id}/test, just against posted fields instead of a stored
+    Device row. Nothing is written to the database."""
+    try:
+        _, content = fetch_running_config(
+            vendor=payload.vendor, host=payload.ip, username=payload.username,
+            password=payload.password, secret=payload.secret,
+            protocol=payload.protocol, port=payload.port, cmd="show version"
+        )
+        audit_event(user=current_user.username, action="device_test_precreate", target=f"{payload.hostname} ({payload.ip})", result="success")
+        snippet = content[:300].decode(errors="ignore")
+        return TestResult(success=True, message="OK", output_snippet=snippet)
+    except Exception as e:
+        audit_event(user=current_user.username, action="device_test_precreate", target=f"{payload.hostname} ({payload.ip})", result=f"failed: {str(e)}")
         return TestResult(success=False, message=f"Failed: {e}")

@@ -31,6 +31,7 @@ class DeviceOut(BaseModel):
 class TestResult(BaseModel):
     success: bool
     message: str
+    output_snippet: Optional[str] = None
 
 
 # --- Users ---

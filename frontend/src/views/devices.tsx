@@ -10,9 +10,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Plus, Search, Trash2, Edit, TestTube, CheckCircle, XCircle, Loader2, UploadCloud } from 'lucide-react';
+import { Plus, Search, Trash2, Edit, TestTube, CheckCircle, XCircle, Loader2, UploadCloud, RadioTower } from 'lucide-react';
 import { EyeToggleButton } from '@/components/eye-toggle-button';
 import { ConfirmDialog, type ConfirmDialogState } from '@/components/confirm-dialog';
+import { ZabbixSyncDialog } from '@/components/zabbix-sync-dialog';
 import { toast } from 'sonner';
 
 interface Device {
@@ -25,6 +26,12 @@ interface Device {
   tags?: string | null;
   last_backup?: string; // Matching backend JSON key (snake_case)
   enabled?: boolean;
+}
+
+interface TestResult {
+  success: boolean;
+  message: string;
+  output_snippet?: string;
 }
 
 export function DevicesPage() {
@@ -51,8 +58,9 @@ export function DevicesPage() {
     return null;
   });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isZabbixDialogOpen, setIsZabbixDialogOpen] = useState(false);
   const [isTestDialogOpen, setIsTestDialogOpen] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [editingDevice, setEditingDevice] = useState<Device | null>(null);
   const [formData, setFormData] = useState({
     hostname: '',
@@ -114,6 +122,22 @@ export function DevicesPage() {
     setFormData({
       hostname: '',
       ip: '',
+      vendor: 'Cisco (IOS Router/Switch)',
+      protocol: 'SSH',
+      port: '22',
+      username: '',
+      password: '',
+      secret: '',
+      tags: '',
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleZabbixPick = (candidate: { hostname: string; ip: string }) => {
+    setEditingDevice(null);
+    setFormData({
+      hostname: candidate.hostname,
+      ip: candidate.ip,
       vendor: 'Cisco (IOS Router/Switch)',
       protocol: 'SSH',
       port: '22',
@@ -276,12 +300,33 @@ export function DevicesPage() {
   };
 
   const handleTestConnection = async (deviceId?: number | string) => {
+    if (!deviceId && editingDevice) deviceId = editingDevice.id;
+
+    // Add mode (no saved device yet): test the in-progress form fields directly
+    if (!deviceId) {
+      if (!formData.ip || !formData.username || !formData.password) {
+        toast.error('Fill in IP, username, and password before testing');
+        return;
+      }
+    }
+
     setIsTestDialogOpen(true);
     setTestResult(null);
     setTestingConnection(true);
     try {
-      if (!deviceId && editingDevice) deviceId = editingDevice.id;
-      const res = await apiPost<unknown, { success: boolean; message: string }>(`/devices/${deviceId}/test`, {} as unknown);
+      const res = deviceId
+        ? await apiPost<unknown, TestResult>(`/devices/${deviceId}/test`, {} as unknown)
+        : await apiPost<Record<string, unknown>, TestResult>('/devices/test-connection', {
+            hostname: formData.hostname,
+            ip: formData.ip,
+            vendor: formData.vendor,
+            protocol: formData.protocol,
+            port: Number(formData.port),
+            username: formData.username,
+            password: formData.password,
+            secret: formData.secret || undefined,
+            tags: formData.tags || undefined,
+          });
       setTestResult(res);
     } catch (err: unknown) {
       const msg = (err && typeof err === 'object' && 'message' in err) ? (err as { message?: string }).message : String(err);
@@ -448,10 +493,16 @@ export function DevicesPage() {
           <p className="text-muted-foreground">Manage network devices for backup</p>
         </div>
         {userRole === 'admin' && (
-          <Button onClick={handleAddDevice} className="gap-2" disabled={loading}>
-            <Plus className="w-4 h-4" />
-            Add Device
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setIsZabbixDialogOpen(true)} className="gap-2" disabled={loading}>
+              <RadioTower className="w-4 h-4" />
+              Sync from Zabbix
+            </Button>
+            <Button onClick={handleAddDevice} className="gap-2" disabled={loading}>
+              <Plus className="w-4 h-4" />
+              Add Device
+            </Button>
+          </div>
         )}
       </div>
 
@@ -671,11 +722,6 @@ export function DevicesPage() {
 
             <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground">
               💡 Device credentials are stored encrypted and never shown again.
-              {!editingDevice && (
-                <div className="mt-2 text-blue-600">
-                  ℹ️ Tip: Save the device first, then use Edit → Test Connection to verify connectivity.
-                </div>
-              )}
             </div>
           </div>
 
@@ -683,19 +729,16 @@ export function DevicesPage() {
             <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={savingDevice || testingConnection}>
               Cancel
             </Button>
-            {/* Only show Test Connection button when editing existing device */}
-            {editingDevice && (
-              <Button onClick={() => handleTestConnection()} disabled={savingDevice || testingConnection}>
-                {testingConnection ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Testing...
-                  </div>
-                ) : (
-                  'Test Connection'
-                )}
-              </Button>
-            )}
+            <Button variant="outline" onClick={() => handleTestConnection()} disabled={savingDevice || testingConnection}>
+              {testingConnection ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                  Testing...
+                </div>
+              ) : (
+                'Test Connection'
+              )}
+            </Button>
             <Button onClick={handleSaveDevice} disabled={savingDevice || testingConnection}>
               {savingDevice ? (
                 <div className="flex items-center gap-2">
@@ -733,6 +776,11 @@ export function DevicesPage() {
                 <p className={testResult.success ? 'text-green-600' : 'text-red-600'}>
                   {testResult.message}
                 </p>
+                {testResult.output_snippet && (
+                  <pre className="w-full text-xs bg-muted text-foreground p-3 rounded-md overflow-x-auto whitespace-pre-wrap text-left max-h-48 overflow-y-auto">
+                    {testResult.output_snippet}
+                  </pre>
+                )}
               </div>
             )}
           </div>
@@ -746,6 +794,7 @@ export function DevicesPage() {
       </Dialog>
 
       <ConfirmDialog state={confirmState} onOpenChange={(open) => !open && setConfirmState(null)} />
+      <ZabbixSyncDialog open={isZabbixDialogOpen} onOpenChange={setIsZabbixDialogOpen} onPick={handleZabbixPick} />
     </div>
   );
 }

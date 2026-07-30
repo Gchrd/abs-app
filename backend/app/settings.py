@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     DB_URL: str = "sqlite:///./abs.db"
     TIMEZONE: str = "Asia/Jakarta"
     BACKUP_DIR: str = "./backups"
+    ZABBIX_URL: str = ""
+    ZABBIX_USERNAME: str = ""
+    ZABBIX_PASSWORD: str = ""
     class Config: env_file = ".env"
 
 settings = Settings()

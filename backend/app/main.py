@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .settings import settings
 from .database import Base, engine
-from .api import devices, jobs, backups
+from .api import devices, jobs, backups, zabbix
 from .services import scheduler
 from .routers import users as users_router, schedules as schedules_router, audit as audit_router, auth as auth_router
 from sqlalchemy import text, inspect
@@ -31,6 +31,7 @@ def health(): return {"status":"ok"}
 app.include_router(devices.router)
 app.include_router(jobs.router)
 app.include_router(backups.router)
+app.include_router(zabbix.router)
 app.include_router(users_router.router)
 app.include_router(schedules_router.router)
 app.include_router(audit_router.router)
