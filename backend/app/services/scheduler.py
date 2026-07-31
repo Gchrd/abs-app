@@ -6,7 +6,7 @@ from ..settings import settings
 from ..database import SessionLocal
 from ..models import Schedule, Device, Job, Backup
 from ..utils.crypto import dec
-from .netmiko_worker import fetch_running_config, NonRetryableBackupError
+from .netmiko_worker import fetch_running_config, NonRetryableBackupError, IncompleteExportError, save_backup_file
 from ..utils.config_sanitizer import sanitize_config
 from .audit_log import audit_event
 from hashlib import sha256
@@ -139,6 +139,36 @@ async def run_scheduled_backup(schedule_id: int, schedule_name: str):
                     # lockout policy from repeated attempts.
                     log_lines.append(f"[{device_info['hostname']}] Backup failed (not retrying - device rejected the command): ({str(e)})")
                     break
+
+                except IncompleteExportError as e:
+                    if attempt < max_attempts - 1:
+                        # Try again for a clean export first - a fresh attempt
+                        # often just works.
+                        log_lines.append(f"[{device_info['hostname']}] Backup failed... ({str(e)})")
+                        delay = retry_delays[attempt]
+                        await asyncio.sleep(delay)
+                    else:
+                        # Every attempt hit the same (minor) export gap - this
+                        # looks like a persistent device-side quirk rather than
+                        # a one-off blip. Save what we did get instead of
+                        # ending up with no backup at all for this device.
+                        fullpath = save_backup_file(device_info['ip'], e.content)
+                        content_str = e.content.decode('utf-8', errors='ignore')
+                        clean_content_str = sanitize_config(content_str, vendor=device_info['vendor'])
+                        clean_hash = sha256(clean_content_str.encode('utf-8')).hexdigest()[:8]
+                        warning = f"Incomplete export after {max_attempts} attempts - missing: {', '.join(e.missing_sections)}"
+                        b = Backup(
+                            device_id=device_info['id'],
+                            size_bytes=len(e.content),
+                            hash=clean_hash,
+                            path=str(fullpath),
+                            batch_id=batch_id,
+                            warning=warning,
+                        )
+                        db.add(b)
+                        ok += 1
+                        db.commit()
+                        log_lines.append(f"[{device_info['hostname']}] Backup saved with warning ({len(e.content)} bytes) - {warning}")
 
                 except Exception as e:
                     if attempt < max_attempts - 1:

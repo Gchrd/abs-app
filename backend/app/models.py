@@ -48,6 +48,11 @@ class Backup(Base):
     status: Mapped[str] = mapped_column(String(16), default="success")
     path: Mapped[str] = mapped_column(String(512))
     batch_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    # Set when this backup was saved despite the device failing to export
+    # some config sections (e.g. a persistent RouterOS export quirk) - the
+    # backup is still real and usable, just not 100% complete. Null for
+    # normal, fully-clean backups.
+    warning: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
 class Schedule(Base):
     __tablename__ = "schedules"

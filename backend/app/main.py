@@ -15,6 +15,9 @@ def run_migrations():
     if "batch_id" not in columns:
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE backups ADD COLUMN batch_id VARCHAR(128)"))
+    if "warning" not in columns:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE backups ADD COLUMN warning VARCHAR(512)"))
 
 run_migrations()
 

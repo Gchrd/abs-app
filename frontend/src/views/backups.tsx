@@ -25,6 +25,7 @@ interface Backup {
   device_name?: string;
   batch_id?: string | null;
   content?: string;
+  warning?: string | null;
 }
 
 interface BatchGroup {
@@ -43,6 +44,7 @@ interface ActiveBackup {
   hash: string;
   status_changed: boolean;
   previous_backup_id: number | null;
+  warning?: string | null;
 }
 
 interface DiffResult {
@@ -735,23 +737,33 @@ export function BackupsPage() {
                       <code className="text-xs bg-muted px-2 py-1 rounded">{ab.hash.slice(0, 8)}</code>
                     </TableCell>
                     <TableCell>
-                      {latestRunStatusLoading ? (
-                        <Badge variant="outline" className="text-muted-foreground gap-1">
-                          <Loader2 className="w-3 h-3 animate-spin" /> Checking...
-                        </Badge>
-                      ) : ab.status_changed ? (
-                        <Badge className="bg-orange-100 text-orange-700 border border-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-800">
-                          🔄 Changed
-                        </Badge>
-                      ) : !succeededDeviceIdsInLatestRun.has(ab.device_id) ? (
-                        <Badge className="bg-red-100 text-red-700 border border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800" title="This device's most recent backup run did not succeed - it may or may not have changed since the last confirmed check.">
-                          ⚠️ Backup Failed
-                        </Badge>
-                      ) : (
-                        <Badge className="bg-green-100 text-green-700 border border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800">
-                          ✅ Unchanged
-                        </Badge>
-                      )}
+                      <div className="flex flex-wrap gap-1">
+                        {latestRunStatusLoading ? (
+                          <Badge variant="outline" className="text-muted-foreground gap-1">
+                            <Loader2 className="w-3 h-3 animate-spin" /> Checking...
+                          </Badge>
+                        ) : ab.status_changed ? (
+                          <Badge className="bg-orange-100 text-orange-700 border border-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-800">
+                            🔄 Changed
+                          </Badge>
+                        ) : !succeededDeviceIdsInLatestRun.has(ab.device_id) ? (
+                          <Badge className="bg-red-100 text-red-700 border border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800" title="This device's most recent backup run did not succeed - it may or may not have changed since the last confirmed check.">
+                            ⚠️ Backup Failed
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-green-100 text-green-700 border border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800">
+                            ✅ Unchanged
+                          </Badge>
+                        )}
+                        {ab.warning && (
+                          <Badge
+                            className="bg-yellow-100 text-yellow-800 border border-yellow-200 dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-800"
+                            title={ab.warning}
+                          >
+                            ⚠ Incomplete
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">

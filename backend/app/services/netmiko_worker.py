@@ -1,6 +1,7 @@
 from netmiko import ConnectHandler
 from hashlib import sha256
 from pathlib import Path
+import re
 from ..settings import settings
 
 
@@ -12,6 +13,20 @@ class NonRetryableBackupError(Exception):
     device with repeated login/command attempts can trip its own lockout
     policy, breaking even manual troubleshooting logins right after."""
     pass
+
+
+class IncompleteExportError(Exception):
+    """Raised when a device (currently: MikroTik) reports it failed to
+    export one or more config sections (RouterOS writes a literal
+    '#error exporting <path>' line for each one), but most of the config
+    still came through fine. Carries the partial content so a caller that's
+    exhausted its retries can save it as a best-effort backup instead of
+    ending up with nothing, while still trying a clean retry first (a
+    fresh attempt often succeeds outright)."""
+    def __init__(self, message: str, content: bytes, missing_sections: list[str]):
+        super().__init__(message)
+        self.content = content
+        self.missing_sections = missing_sections
 
 
 class TelnetAuthError(Exception):
@@ -33,6 +48,19 @@ _TELNET_AUTH_FAILURE_MARKERS = (
     b"Authentication failed",
     b"Access denied",
 )
+
+
+def save_backup_file(host: str, content: bytes) -> Path:
+    """Write a fetched config to BACKUP_DIR and return its path. Shared by
+    fetch_running_config's normal success path and by callers (scheduler,
+    manual-trigger job runner) that save a best-effort partial backup after
+    catching IncompleteExportError on the final retry attempt."""
+    filehash = sha256(content).hexdigest()[:8]
+    Path(settings.BACKUP_DIR).mkdir(parents=True, exist_ok=True)
+    filename = f"{host}_{filehash}.cfg"
+    fullpath = Path(settings.BACKUP_DIR) / filename
+    fullpath.write_bytes(content)
+    return fullpath
 
 
 def _redact(text: str, *secret_values: str | None) -> str:
@@ -492,17 +520,41 @@ def fetch_running_config(
         raise Exception("Backup failure: Output is empty or suspiciously short (less than 10 chars). The device might be busy, slow to respond, or the prompt was not detected correctly.")
 
     if "#error exporting" in output:
-        # RouterOS failed to export one or more config sections on this run
-        # (a transient export-command quirk, not an actual config change).
+        # RouterOS failed to export one or more config sections on this run.
         # The sanitizer used to just strip this marker out before hashing,
         # which meant an incomplete backup got saved and counted as a normal
-        # success. Raise a plain (retryable) error instead - a later attempt
-        # may succeed cleanly, and this way a persistently incomplete export
-        # actually shows up as a failed job instead of silently going unnoticed.
-        raise Exception(
-            f"Backup failure: Device reported an incomplete config export "
-            f"('#error exporting' found in output) - one or more sections "
-            f"failed to export. Raw reply snippet: {output.strip()[:200]!r}"
+        # success with no trace of what was missing - fixed by detecting it
+        # here instead. But some devices hit this on effectively every run
+        # (a persistent RouterOS/model quirk on a specific section, not a
+        # one-off blip) - failing the job forever means that device never
+        # gets backed up again at all, which is worse than a backup that's
+        # missing a section or two. So: measure how much of the export
+        # actually failed (failed section count vs successfully-exported
+        # section count, from RouterOS's own "/path" headers) rather than
+        # just failing outright on any mention of the marker.
+        missing_sections = re.findall(r"^#error exporting (\S.*)$", output, re.MULTILINE)
+        ok_sections = re.findall(r"^(/\S.*)$", output, re.MULTILINE)
+        total_attempted = len(missing_sections) + len(ok_sections)
+        fail_ratio = (len(missing_sections) / total_attempted) if total_attempted else 1.0
+
+        if fail_ratio > 0.5:
+            # Most of the export failed - this isn't "a couple of sections
+            # missing", something is seriously wrong. Keep failing the job
+            # (retryable) rather than saving what's likely a near-empty file.
+            raise Exception(
+                f"Backup failure: Device reported an incomplete config export - most "
+                f"sections failed ({len(missing_sections)}/{total_attempted}). "
+                f"Missing: {', '.join(missing_sections)}"
+            )
+
+        # Minority of sections failed - let the caller retry for a clean
+        # export first, but carry the partial content so it can be saved
+        # as a best-effort backup if every retry hits the same problem.
+        raise IncompleteExportError(
+            f"Backup incomplete: {len(missing_sections)}/{total_attempted} section(s) "
+            f"failed to export: {', '.join(missing_sections)}",
+            output.encode(),
+            missing_sections,
         )
 
     if _looks_like_cli_error(output):
@@ -516,12 +568,6 @@ def fetch_running_config(
             f"Raw reply: {safe_output!r} | enable() result: {safe_enable_error!r}{transcript_note}"
         )
 
-    # Simpan ke file
     content = output.encode()
-    filehash = sha256(content).hexdigest()[:8]
-    Path(settings.BACKUP_DIR).mkdir(parents=True, exist_ok=True)
-    filename = f"{host}_{filehash}.cfg"
-    fullpath = Path(settings.BACKUP_DIR) / filename
-    fullpath.write_bytes(content)
-
+    fullpath = save_backup_file(host, content)
     return str(fullpath), content

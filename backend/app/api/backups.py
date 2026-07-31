@@ -34,6 +34,7 @@ def list_backups(current_user=Depends(get_current_user), db: Session = Depends(g
             "status": b.status,
             "path": b.path,
             "batch_id": b.batch_id,
+            "warning": b.warning,
         })
     return out
 
@@ -105,6 +106,7 @@ def list_active_backups(current_user=Depends(get_current_user), db: Session = De
             "hash": active.hash,
             "status_changed": status_changed,
             "previous_backup_id": newer_backup_id,  # ID of the newer backup (for diff)
+            "warning": active.warning,
         })
     return out
 
