@@ -30,10 +30,10 @@ export function ZabbixHelpDialog({
           <div>
             <p className="font-medium mb-1">Fitur ini buat apa?</p>
             <p className="text-muted-foreground">
-              Zabbix (sistem monitoring jaringan yang sudah dipakai perusahaan) sudah tahu daftar semua switch/router yang ada
-              di jaringan. Tapi ABS tidak otomatis ikut tahu - kalau ada switch baru yang dipasang dan dimasukkan ke Zabbix,
-              admin harus mencatat IP dan hostname-nya secara manual lalu mengetiknya lagi satu-satu di ABS. Itu kerja dua kali
-              untuk hal yang sama.
+              Setiap ada switch/router baru dipasang, tim jaringan biasanya sudah memasukkannya ke Zabbix dulu (untuk monitoring).
+              Tapi ABS tidak otomatis ikut tahu data itu - meskipun sudah ada di Zabbix, admin masih harus mencatat IP dan
+              hostname-nya lagi secara manual lalu mengetiknya sekali lagi di ABS. Jadi data yang sama harus dimasukkan dua kali
+              di dua sistem berbeda.
             </p>
             <p className="text-muted-foreground mt-2">
               &quot;Sync from Zabbix&quot; menghilangkan kerja dua kali itu: ABS langsung bertanya ke Zabbix &quot;device apa saja yang
