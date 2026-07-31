@@ -30,6 +30,17 @@ interface Schedule {
   notify_on_fail?: boolean;
   notifyOnFail?: boolean;
   enabled: boolean;
+  next_run?: string | null;
+}
+
+function formatNextRun(ts?: string | null) {
+  if (!ts) return '-';
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return '-';
+  return d.toLocaleString('id-ID', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
 }
 
 export function SchedulesPage() {
@@ -247,6 +258,7 @@ export function SchedulesPage() {
               <TableHead>Name</TableHead>
               <TableHead>Interval (days)</TableHead>
               <TableHead>Run At</TableHead>
+              <TableHead>Next Run</TableHead>
               <TableHead>Target</TableHead>
               <TableHead>Retention</TableHead>
               <TableHead>Enabled</TableHead>
@@ -256,7 +268,7 @@ export function SchedulesPage() {
           <TableBody>
             {schedules.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                   {loading ? 'Loading schedules...' : 'No schedules found'}
                 </TableCell>
               </TableRow>
@@ -279,6 +291,9 @@ export function SchedulesPage() {
                     <TableCell>{schedule.name}</TableCell>
                     <TableCell>{intervalDays}</TableCell>
                     <TableCell>{runAt}</TableCell>
+                    <TableCell className="text-sm">
+                      {schedule.enabled ? formatNextRun(schedule.next_run) : '-'}
+                    </TableCell>
                     <TableCell>{targetDisplay}</TableCell>
                     <TableCell>Keep {retention}</TableCell>
                     <TableCell>

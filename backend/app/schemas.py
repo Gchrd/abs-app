@@ -74,6 +74,7 @@ class ScheduleOut(BaseModel):
     target_tags: Optional[str] = None
     retention: int
     notify_on_fail: bool
+    next_run: Optional[datetime] = None
 
 
 # --- Audit ---

@@ -24,6 +24,19 @@ def _ensure_default_schedule():
     pass
 
 
+def _next_run_for(schedule_id: int):
+    """Look up the next fire time APScheduler actually has queued for this
+    schedule, rather than recomputing it ourselves - it already tracks this
+    per-job (accounting for the configured interval, run time, and timezone)
+    and is the one source of truth for when a schedule will really run next."""
+    job = sched_service.scheduler.get_job(f"schedule-{schedule_id}")
+    # next_run_time is only populated once the scheduler has actually been
+    # started (e.g. never in the test suite, which disables the startup
+    # hook) - the attribute doesn't exist at all before that, rather than
+    # just being None, so access it defensively.
+    return getattr(job, "next_run_time", None) if job else None
+
+
 @router.get("", response_model=list[ScheduleOut])
 def list_schedules(current_user=Depends(get_current_user), db: Session = Depends(get_db)):
     rows = db.query(Schedule).all()
@@ -32,7 +45,8 @@ def list_schedules(current_user=Depends(get_current_user), db: Session = Depends
         out.append(ScheduleOut(
             id=r.id, name=r.name, run_at=r.run_at, enabled=bool(r.enabled),
             interval_days=r.interval_days, target_type=r.target_type,
-            target_tags=r.target_tags, retention=r.retention, notify_on_fail=bool(r.notify_on_fail)
+            target_tags=r.target_tags, retention=r.retention, notify_on_fail=bool(r.notify_on_fail),
+            next_run=_next_run_for(r.id)
         ))
     return out
 
@@ -68,7 +82,8 @@ def create_schedule(payload: ScheduleIn, db: Session = Depends(get_db), current_
     return ScheduleOut(
         id=s.id, name=s.name, run_at=s.run_at, enabled=bool(s.enabled),
         interval_days=s.interval_days, target_type=s.target_type,
-        target_tags=s.target_tags, retention=s.retention, notify_on_fail=bool(s.notify_on_fail)
+        target_tags=s.target_tags, retention=s.retention, notify_on_fail=bool(s.notify_on_fail),
+        next_run=_next_run_for(s.id)
     )
 
 
@@ -98,7 +113,8 @@ def update_schedule(schedule_id: int, payload: ScheduleIn, db: Session = Depends
     return ScheduleOut(
         id=s.id, name=s.name, run_at=s.run_at, enabled=bool(s.enabled),
         interval_days=s.interval_days, target_type=s.target_type,
-        target_tags=s.target_tags, retention=s.retention, notify_on_fail=bool(s.notify_on_fail)
+        target_tags=s.target_tags, retention=s.retention, notify_on_fail=bool(s.notify_on_fail),
+        next_run=_next_run_for(s.id)
     )
 
 
