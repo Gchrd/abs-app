@@ -24,7 +24,7 @@ Enterprise-grade network device configuration backup system dengan scheduling, r
 
 ```bash
 # Clone repository
-git clone https://github.com/Josether/abs-app.git
+git clone https://github.com/Gchrd/abs-app.git
 cd abs-app
 
 # Run automated deployment
@@ -235,7 +235,7 @@ git push fork main
 - SmartAX (`huawei_smartax`)
 
 ### Others
-- Allied Telesis AWPlus (`allied_telesis_awplus`)
+- Allied Telesis AWPlus (`cisco_ios`-compatible CLI)
 - Fortinet FortiGate (`fortinet`)
 - Juniper JunOS (`juniper`)
 
@@ -285,17 +285,14 @@ abs-app/
 
 ---
 
-## 🆕 Recent UI Updates
+## 🆕 Recent Updates
 
-Ringkasan pembaruan tampilan & fitur terbaru pada frontend:
-
-- **Dashboard** dirombak jadi lebih "eye-catching": stat card dengan gradient + tren 7 hari, widget **Quick Search & Download** untuk cari & unduh backup langsung dari dashboard, dan widget **Backup Changes** yang menyorot perangkat dengan konfigurasi berubah.
-- **Halaman Backups** dirapikan: toolbar filter/pencarian disatukan dengan badge jumlah hasil, section "Active Backup" dan "Backup History" dibungkus card yang konsisten, kolom tanggal yang tidak terpakai dihapus.
-- **Login**: tombol mata (custom icon) untuk show/hide password.
-- **Sidebar**: dipersempit jadi rail berisi ikon saja, nama menu muncul saat hover (tooltip).
-- **Dark mode**: toggle matahari/bulan di topbar, tersimpan otomatis di browser (localStorage), tidak ada flash tema salah saat reload.
-- **Navigasi disederhanakan**: halaman **Jobs** + **Schedules** digabung jadi satu halaman **Backup Schedule** (dengan tab), dan **Users** + **Audit Logs** digabung jadi **User Settings** (dengan tab, admin-only).
-- **Devices**: admin bisa reveal password perangkat (toggle mata), viewer hanya melihat `****`; setiap reveal tercatat di Audit Logs.
+- **Zabbix Sync**: tombol "Sync from Zabbix" di halaman Devices - pilih host group, ABS otomatis menyaring device yang sudah ada di ABS + mengecek reachability (port 22/23), lalu satu klik untuk pre-fill form Add Device. Ada dialog bantuan (tombol "?") yang menjelaskan cara kerjanya untuk user non-teknis.
+- **Test Connection sebelum Save**: kredensial device bisa dites langsung dari dialog Add Device (tidak perlu save dulu), hasilnya menampilkan cuplikan output asli dari device.
+- **Partial backup**: kalau device gagal export sebagian config secara konsisten (bukan sekadar gangguan sesaat), ABS tetap menyimpan backup-nya dengan tanda "Incomplete" alih-alih membuang semuanya - device yang sebagian bermasalah tetap punya cadangan config, bukan nihil.
+- **Next Run**: halaman Schedules menampilkan tanggal & jam pasti untuk jadwal backup berikutnya, bukan cuma info interval harinya.
+- **Keamanan kredensial**: perbaikan pada penanganan enable-secret device (tidak lagi terhapus saat toggle enable/edit), password/secret di-redact dari job log, dan rotasi `SECRET_KEY` yang sempat ter-commit ke git.
+- **Diagnostik lebih jelas**: pesan error autentikasi Telnet/SSH kini spesifik ("Authentication failed", bukan error socket mentah), termasuk untuk device dengan autentikasi password-only (tanpa username).
 
 ---
 
@@ -313,21 +310,14 @@ This project is licensed under the MIT License.
 
 ## 👤 Author
 
-**Joseph Christian Lubis**
+**Joseph Christian Lubis** - Original creator
 - GitHub: [@Josether](https://github.com/Josether)
 - Email: joseph.lubis@binus.ac.id
 - University: Binus University
 - Program: Computer Science
 
----
-
-## 🎓 Academic Information
-
-This project was developed as a thesis/final project for [Degree Program] at [University Name].
-
-**Project Title:** ABS - Automated Backup System: Enterprise Network Device Configuration Management
-
-**Year:** 2026
+**Richard Giansanto** - Editor / maintainer (this fork)
+- GitHub: [@Gchrd](https://github.com/Gchrd)
 
 ---
 
@@ -340,4 +330,4 @@ This project was developed as a thesis/final project for [Degree Program] at [Un
 
 ---
 
-*Last Updated: July 21, 2026*
+*Last Updated: July 31, 2026*
