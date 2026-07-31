@@ -10,10 +10,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Plus, Search, Trash2, Edit, TestTube, CheckCircle, XCircle, Loader2, UploadCloud, RadioTower } from 'lucide-react';
+import { Plus, Search, Trash2, Edit, TestTube, CheckCircle, XCircle, Loader2, UploadCloud, RadioTower, HelpCircle } from 'lucide-react';
 import { EyeToggleButton } from '@/components/eye-toggle-button';
 import { ConfirmDialog, type ConfirmDialogState } from '@/components/confirm-dialog';
 import { ZabbixSyncDialog } from '@/components/zabbix-sync-dialog';
+import { ZabbixHelpDialog } from '@/components/zabbix-help-dialog';
 import { toast } from 'sonner';
 
 interface Device {
@@ -59,6 +60,7 @@ export function DevicesPage() {
   });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isZabbixDialogOpen, setIsZabbixDialogOpen] = useState(false);
+  const [isZabbixHelpOpen, setIsZabbixHelpOpen] = useState(false);
   const [isTestDialogOpen, setIsTestDialogOpen] = useState(false);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [editingDevice, setEditingDevice] = useState<Device | null>(null);
@@ -498,6 +500,15 @@ export function DevicesPage() {
               <RadioTower className="w-4 h-4" />
               Sync from Zabbix
             </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsZabbixHelpOpen(true)}
+              title="Apa itu Sync from Zabbix?"
+              className="text-muted-foreground"
+            >
+              <HelpCircle className="w-4 h-4" />
+            </Button>
             <Button onClick={handleAddDevice} className="gap-2" disabled={loading}>
               <Plus className="w-4 h-4" />
               Add Device
@@ -795,6 +806,7 @@ export function DevicesPage() {
 
       <ConfirmDialog state={confirmState} onOpenChange={(open) => !open && setConfirmState(null)} />
       <ZabbixSyncDialog open={isZabbixDialogOpen} onOpenChange={setIsZabbixDialogOpen} onPick={handleZabbixPick} />
+      <ZabbixHelpDialog open={isZabbixHelpOpen} onOpenChange={setIsZabbixHelpOpen} />
     </div>
   );
 }
