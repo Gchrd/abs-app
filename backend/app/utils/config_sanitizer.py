@@ -94,6 +94,13 @@ def sanitize_aruba(content: str) -> str:
         r"^; Generated on ",
         r"^; Current System Time:",
         r"^Current system time:",
+        # "controller config <N>" is an internal checkpoint/revision counter
+        # that increments on its own over time - confirmed live: two backups
+        # taken days apart had this as the ONLY differing line after the
+        # redact rules below, with every actual config line identical, so it
+        # doesn't track meaningful config changes and just causes false
+        # "Changed" alerts.
+        r"^controller config \d+",
     ]
     content = sanitize_regex(content, patterns)
 
