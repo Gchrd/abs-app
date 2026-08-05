@@ -1021,6 +1021,12 @@ export function BackupsPage() {
               {selectedBackup?.device_name ?? selectedBackup?.device_id} — {formatDate(selectedBackup?.timestamp ?? '')}
             </DialogTitle>
           </DialogHeader>
+          {selectedBackup?.warning && (
+            <div className="shrink-0 flex items-start gap-2 text-sm rounded-md border border-yellow-200 bg-yellow-50 text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-300 px-3 py-2">
+              <span>⚠</span>
+              <span>{selectedBackup.warning}</span>
+            </div>
+          )}
           <div className="flex-1 overflow-hidden py-2">
             <div className="bg-gray-900 text-gray-100 p-4 rounded-lg h-full overflow-auto font-mono text-sm">
               <pre className="whitespace-pre-wrap break-words">{selectedBackup?.content}</pre>
