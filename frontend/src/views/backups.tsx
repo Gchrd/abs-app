@@ -251,7 +251,7 @@ export function BackupsPage() {
     try {
       const data = await apiGet<unknown[]>('/backups');
       const mapped = data.map((b: unknown) => {
-        const backup = b as { id: number; device_id: number; timestamp: string; size: number; hash: string; status: string; device_name?: string };
+        const backup = b as { id: number; device_id: number; timestamp: string; size: number; hash: string; status: string; device_name?: string; batch_id?: string | null; warning?: string | null };
         return {
           id: backup.id,
           device_id: backup.device_id,
@@ -260,6 +260,8 @@ export function BackupsPage() {
           hash: backup.hash,
           status: backup.status,
           device_name: backup.device_name ?? String(backup.device_id),
+          batch_id: backup.batch_id,
+          warning: backup.warning,
         };
       }) as Backup[];
       setBackups(mapped);
